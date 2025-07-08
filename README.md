@@ -71,10 +71,10 @@ spec:
   name: "my-crossplane-vm"
   numVcpus: 2
   memorySizeMib: 4096
-  clusterUuid: "00000000-0000-0000-0000-000000000000"  # Replace with your cluster UUID
-  subnetUuid: "11111111-1111-1111-1111-111111111111"   # Replace with your subnet UUID
-  imageUuid: "22222222-2222-2222-2222-222222222222"    # Replace with your image UUID
+  clusterName: "ch01-aza-ntnx-01"  # Specify the cluster name to fetch details dynamically
 ```
+
+The provider will automatically fetch the `clusterUuid`, `subnetUuid`, and `imageUuid` from the JSON file corresponding to the specified `clusterName`. Ensure the JSON file is mounted in the provider pod at `/etc/provider/<cluster-name>.json`.
 
 ## Finding UUIDs
 
