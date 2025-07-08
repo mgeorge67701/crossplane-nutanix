@@ -1,0 +1,60 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+dist/
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Go workspace file
+go.work
+go.work.sum
+
+# Dependency directories
+vendor/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.bak
+*.log
+
+# Build artifacts
+provider-nutanix
+*.xpkg
+*.tar.gz
+*.zip
+
+# Package build directory contents (but keep the directory structure)
+package/provider
+package/*.yaml
+!package/crossplane.yaml
+!package/README.md
+!package/icon.svg
+!package/examples/
+
+# Local environment files
+.env
+.env.local
