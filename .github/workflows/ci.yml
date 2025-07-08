@@ -76,23 +76,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-    - name: Validate package example manifests
-      run: |
-        if [ -d package/examples ]; then
-          find package/examples/ -name "*.yaml" -o -name "*.yml" | xargs -I {} sh -c 'echo "Validating {}" && cat {} | grep -q "apiVersion" || (echo "Invalid YAML: {}" && exit 1)'
-          echo "✅ Package examples validation completed successfully"
-        else
-          echo "No package/examples directory found, skipping validation."
-        fi
     - name: Validate root examples directory
       run: |
         if [ -d examples ]; then
-          echo "Found root examples directory with additional examples"
-          find examples/ -name "*.yaml" -o -name "*.yml" | xargs -I {} sh -c 'echo "Checking {}" && cat {} | grep -q "apiVersion" || echo "Note: {} may be advanced example"'
-          echo "✅ Root examples check completed"
+          echo "Found examples directory with usage examples"
+          find examples/ -name "*.yaml" -o -name "*.yml" | xargs -I {} sh -c 'echo "Checking {}" && cat {} | grep -q "apiVersion" || echo "Note: {} may be documentation example"'
+          echo "✅ Examples check completed - examples available in repository"
         else
-          echo "No root examples directory found."
+          echo "No examples directory found."
         fi
+    - name: Note about package examples
+      run: |
+        echo "ℹ️  Examples are provided in the /examples directory of the repository"
+        echo "   They are not included in the package to avoid CRD validation conflicts"
+        echo "   Users can find complete examples at: https://github.com/mgeorge67701/provider-nutanix/tree/main/examples"
 
   build:
     runs-on: ubuntu-latest

@@ -11,8 +11,4 @@ package-dir:
 copy-provider: package-dir build
 	cp bin/provider package/
 	cp config/crd/nutanix.crossplane.io_*.yaml package/
-	@if [ -d package/examples ]; then \
-		echo "Examples already present in package directory"; \
-	else \
-		echo "Examples directory not found but will be included in package"; \
-	fi
+	@echo "Note: Examples are available in the /examples directory but not included in package to avoid validation conflicts"
