@@ -4,11 +4,21 @@ metadata:
   name: provider-nutanix
   annotations:
     meta.crossplane.io/maintainer: Crossplane Community <info@crossplane.io>
-    meta.crossplane.io/source: github.com/crossplane/provider-nutanix
+    meta.crossplane.io/source: github.com/mgeorge67701/provider-nutanix
     meta.crossplane.io/license: Apache-2.0
     meta.crossplane.io/description: |
       The Nutanix Crossplane provider enables infrastructure management on
-      Nutanix clusters.
+      Nutanix clusters. This provider allows you to create and manage Nutanix
+      virtual machines using Kubernetes-style declarative configuration.
+      
+      Features:
+      - Create and manage Nutanix VMs with configurable CPU, memory, and disk
+      - Integration with Nutanix Prism Central API
+      - Support for Crossplane compositions and composite resources
+      - Complete examples and setup guides included
+      
+      Check the examples/ directory for quick start guides, sample manifests,
+      and advanced usage patterns including compositions and composite resources.
 spec:
   controller:
     image: ghcr.io/mgeorge67701/provider-nutanix:latest

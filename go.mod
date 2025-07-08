@@ -1,4 +1,4 @@
-module github.com/crossplane/provider-nutanix
+module github.com/mgeorge67701/provider-nutanix
 
 go 1.23.0
 

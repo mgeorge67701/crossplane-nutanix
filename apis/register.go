@@ -19,8 +19,8 @@ package apis
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 
-	"github.com/crossplane/provider-nutanix/apis/v1alpha1"
-	"github.com/crossplane/provider-nutanix/apis/v1beta1"
+	"github.com/mgeorge67701/provider-nutanix/apis/v1alpha1"
+	"github.com/mgeorge67701/provider-nutanix/apis/v1beta1"
 )
 
 var (

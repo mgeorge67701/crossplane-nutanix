@@ -1,0 +1,57 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: CompositeResourceDefinition
+metadata:
+  name: xnutanixvms.platform.example.com
+spec:
+  group: platform.example.com
+  names:
+    kind: XNutanixVM
+    plural: xnutanixvms
+  claimNames:
+    kind: NutanixVM
+    plural: nutanixvms
+  versions:
+  - name: v1alpha1
+    served: true
+    referenceable: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            properties:
+              parameters:
+                type: object
+                properties:
+                  vmName:
+                    type: string
+                    description: Name of the virtual machine
+                  size:
+                    type: string
+                    description: Size of the VM (small, medium, large)
+                    enum: ["small", "medium", "large"]
+                    default: "small"
+                  imageUuid:
+                    type: string
+                    description: UUID of the disk image to use
+                  clusterUuid:
+                    type: string
+                    description: UUID of the Nutanix cluster
+                  subnetUuid:
+                    type: string
+                    description: UUID of the network subnet
+                required:
+                - vmName
+                - imageUuid
+                - clusterUuid
+                - subnetUuid
+          status:
+            type: object
+            properties:
+              vmId:
+                type: string
+                description: ID of the created virtual machine
+              state:
+                type: string
+                description: Current state of the virtual machine
