@@ -16,16 +16,14 @@ metadata:
       - Integration with Nutanix Prism Central API
       - Support for Crossplane compositions and composite resources
       
-      📚 Quick Start & Examples:
-      Complete examples, setup guides, and advanced usage patterns are available
-      in the project repository at:
-      https://github.com/mgeorge67701/provider-nutanix/tree/main/examples
+      📚 Getting Started:
+      This package includes complete examples and documentation:
+      - Quick Start guide with step-by-step instructions
+      - Provider configuration examples
+      - Virtual machine creation examples
+      - Advanced usage patterns and compositions
       
-      The examples include:
-      - Basic VirtualMachine and ProviderConfig examples
-      - Automated setup script for quick installation
-      - Advanced Composition and XRD patterns
-      - Step-by-step documentation
+      All examples are included in this package for immediate use!
 spec:
   controller:
     image: ghcr.io/mgeorge67701/provider-nutanix:latest

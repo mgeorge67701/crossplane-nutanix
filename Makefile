@@ -11,4 +11,4 @@ package-dir:
 copy-provider: package-dir build
 	cp bin/provider package/
 	cp config/crd/nutanix.crossplane.io_*.yaml package/
-	@echo "Note: Examples are available in the /examples directory but not included in package to avoid validation conflicts"
+	@echo "✅ Examples included as markdown files in package/examples/"
