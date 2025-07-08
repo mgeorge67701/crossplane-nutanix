@@ -71,7 +71,7 @@ spec:
   name: "my-crossplane-vm"
   numVcpus: 2
   memorySizeMib: 4096
-  clusterName: "ch01-aza-ntnx-01"  # Specify the cluster name to fetch details dynamically
+  clusterName: "aza-ntnx-01"  # Specify the cluster name to fetch details dynamically
 ```
 
 The provider will automatically fetch the `clusterUuid`, `subnetUuid`, and `imageUuid` from the JSON file corresponding to the specified `clusterName`. Ensure the JSON file is mounted in the provider pod at `/etc/provider/<cluster-name>.json`.
