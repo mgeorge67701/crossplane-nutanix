@@ -63,8 +63,11 @@ To find the required UUIDs for your Nutanix environment, you can use the Nutanix
 
 - `providerconfig.yaml` - Provider configuration with credentials
 - `virtualmachine.yaml` - Example virtual machine resource
-- `composition.yaml` - Example composition for reusable VM templates
-- `xrd.yaml` - Example composite resource definition
+- `setup.sh` - Automated setup script
+
+For advanced examples including Compositions and Composite Resources,
+see the `examples/` directory in the project repository:
+<https://github.com/mgeorge67701/provider-nutanix/tree/main/examples>
 
 ## Additional Resources
 

@@ -1,0 +1,15 @@
+apiVersion: platform.example.com/v1alpha1
+kind: NutanixVM
+metadata:
+  name: my-web-server
+  namespace: default
+spec:
+  parameters:
+    vmName: "web-server-01"
+    size: "medium"
+    clusterUuid: "12345678-1234-1234-1234-123456789abc"  # Replace with your cluster UUID
+    subnetUuid: "87654321-4321-4321-4321-cba987654321"   # Replace with your subnet UUID
+    imageUuid: "abcdef12-3456-7890-abcd-ef1234567890"    # Replace with your image UUID (e.g., Ubuntu 20.04)
+  compositionRef:
+    name: nutanix-vm-composition
+  writeConnectionSecretsToNamespace: default

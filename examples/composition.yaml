@@ -1,0 +1,58 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: nutanix-vm-composition
+  labels:
+    provider: nutanix
+    service: vm
+spec:
+  compositeTypeRef:
+    apiVersion: platform.example.com/v1alpha1
+    kind: XNutanixVM
+  
+  resources:
+  - name: vm
+    base:
+      apiVersion: nutanix.crossplane.io/v1alpha1
+      kind: VirtualMachine
+      spec:
+        numVcpus: 2
+        memorySizeMib: 2048
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.parameters.vmName
+      toFieldPath: spec.name
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.parameters.imageUuid
+      toFieldPath: spec.imageUuid
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.parameters.clusterUuid
+      toFieldPath: spec.clusterUuid
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.parameters.subnetUuid
+      toFieldPath: spec.subnetUuid
+    - type: ToCompositeFieldPath
+      fromFieldPath: status.vmId
+      toFieldPath: status.vmId
+    - type: ToCompositeFieldPath
+      fromFieldPath: status.state
+      toFieldPath: status.state
+    # Transform VM size to CPU/Memory specs
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.parameters.size
+      toFieldPath: spec.numVcpus
+      transforms:
+      - type: map
+        map:
+          small: 2
+          medium: 4
+          large: 8
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.parameters.size
+      toFieldPath: spec.memorySizeMib
+      transforms:
+      - type: map
+        map:
+          small: 2048
+          medium: 8192
+          large: 16384
