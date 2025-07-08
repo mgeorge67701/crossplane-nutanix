@@ -10,4 +10,4 @@ package-dir:
 
 copy-provider: package-dir build
 	cp bin/provider package/
-	cp config/crd/*.yaml package/
+	cp config/crd/nutanix.crossplane.io_*.yaml package/
