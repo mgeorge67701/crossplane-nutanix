@@ -111,6 +111,52 @@ The ProviderConfig resource configures authentication to your Nutanix cluster:
 - **Endpoint configuration**: Prism Central URL
 - **Multiple configurations**: Support for multiple Nutanix environments
 
+## Using a JSON File for Cluster Details
+
+You can store cluster UUIDs and other details in a JSON file and mount it into the provider pod. The provider will read this file at runtime.
+
+### Example JSON File
+
+```json
+{
+  "clusterUuid": "00000000-0000-0000-0000-000000000000",
+  "subnetUuid": "11111111-1111-1111-1111-111111111111",
+  "imageUuid": "22222222-2222-2222-2222-222222222222"
+}
+```
+
+### Mounting the JSON File
+
+Create a ConfigMap with the JSON file:
+
+```bash
+kubectl create configmap cluster-details -n crossplane-system \
+  --from-file=cluster-details.json=/path/to/cluster-details.json
+```
+
+Update the provider deployment to mount the ConfigMap:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: provider-nutanix
+spec:
+  template:
+    spec:
+      containers:
+      - name: provider
+        volumeMounts:
+        - name: cluster-details
+          mountPath: /etc/provider
+      volumes:
+      - name: cluster-details
+        configMap:
+          name: cluster-details
+```
+
+The provider will automatically read the JSON file from `/etc/provider/cluster-details.json` and use the values dynamically.
+
 ## Development
 
 ### Building the Provider

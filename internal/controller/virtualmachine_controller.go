@@ -1,9 +1,10 @@
 package controller
 
 import (
-	context "context"
+	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/mgeorge67701/provider-nutanix/apis/v1alpha1"
@@ -19,6 +20,20 @@ import (
 type VirtualMachineReconciler struct {
 	client.Client
 	log logging.Logger
+}
+
+// Function to dynamically select and parse JSON file based on cluster name
+func readClusterDetailsByName(clusterName string) (map[string]string, error) {
+	filePath := fmt.Sprintf("/etc/provider/%s.json", clusterName)
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, err
+	}
+	var details map[string]string
+	if err := json.Unmarshal(data, &details); err != nil {
+		return nil, err
+	}
+	return details, nil
 }
 
 func (r *VirtualMachineReconciler) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
@@ -77,8 +92,27 @@ func (r *VirtualMachineReconciler) Reconcile(ctx context.Context, req reconcile.
 		return reconcile.Result{}, nil
 	}
 
+	// Assume cluster name is provided in the VirtualMachine spec
+	clusterName := vm.Spec.ClusterName
+	if clusterName == "" {
+		r.log.Debug("Cluster name not specified in VirtualMachine spec")
+		return reconcile.Result{}, fmt.Errorf("cluster name is required")
+	}
+
+	// Read cluster details from the corresponding JSON file
+	clusterDetails, err := readClusterDetailsByName(clusterName)
+	if err != nil {
+		r.log.Debug("Failed to read cluster details", "error", err)
+		return reconcile.Result{}, err
+	}
+
+	// Use clusterDetails dynamically
+	vm.Spec.ClusterUUID = clusterDetails["clusterUuid"]
+	vm.Spec.SubnetUUID = clusterDetails["subnetUuid"]
+	vm.Spec.ImageUUID = clusterDetails["imageUuid"]
+
 	// Handle observe
-	_, err := ntxCli.GetVM(ctx, vm.Status.VMID)
+	_, err = ntxCli.GetVM(ctx, vm.Status.VMID)
 	if err != nil {
 		r.log.Debug("Failed to get VM", "error", err)
 		return reconcile.Result{}, err

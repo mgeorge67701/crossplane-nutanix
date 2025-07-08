@@ -16,6 +16,7 @@ type VirtualMachineSpec struct {
 	ClusterUUID   string `json:"clusterUuid"`
 	SubnetUUID    string `json:"subnetUuid"`
 	ImageUUID     string `json:"imageUuid"`
+	ClusterName   string `json:"clusterName"`
 }
 
 // VirtualMachineStatus defines the observed state of a Nutanix VM.
