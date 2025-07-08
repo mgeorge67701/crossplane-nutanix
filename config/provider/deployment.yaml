@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: provider-nutanix
+  namespace: crossplane-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: provider-nutanix
+  template:
+    metadata:
+      labels:
+        app: provider-nutanix
+    spec:
+      serviceAccountName: provider-nutanix
+      containers:
+        - name: provider-nutanix
+          image: crossplane/provider-nutanix:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - /provider
+          env:
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace

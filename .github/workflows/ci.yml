@@ -1,0 +1,284 @@
+name: Crossplane Provider CI/CD
+
+on:
+  push:
+    branches: [ main, develop ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+  release:
+    types: [ published ]
+
+permissions:
+  contents: write
+  packages: write
+  attestations: write
+  id-token: write
+
+jobs:
+  debug:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Debug event information
+      run: |
+        echo "Event name: ${{ github.event_name }}"
+        echo "Ref: ${{ github.ref }}"
+        echo "Ref type: ${{ github.ref_type }}"
+        echo "Tag: ${{ github.ref_name }}"
+        echo "Event action: ${{ github.event.action }}"
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24'
+        cache: true
+        cache-dependency-path: 'go.sum'
+    - name: Download dependencies
+      run: |
+        go clean -modcache || true
+        go mod download
+      env:
+        GOPROXY: https://proxy.golang.org,direct
+    - name: Run tests
+      run: go test -v ./...
+      env:
+        CGO_ENABLED: 0
+    - name: Run go vet
+      run: go vet ./...
+    - name: Install golangci-lint
+      run: |
+        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin latest
+        echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
+    - name: Run golangci-lint
+      run: golangci-lint run --timeout=10m
+    - name: Check formatting
+      run: |
+        if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
+          echo "Code is not formatted properly:"
+          gofmt -s -l .
+          exit 1
+        fi
+    - name: Generate Go code
+      run: make generate
+    - name: Check if Go code is up to date
+      run: |
+        if [ -n "$(git status --porcelain apis/)" ]; then
+          echo "Generated Go code is not up to date. Please run 'make generate' and commit the changes."
+          git status --porcelain apis/
+          exit 1
+        fi
+
+  validate-examples:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Validate Crossplane example manifests
+      run: |
+        if [ -d examples ]; then
+          find examples/ -name "*.yaml" -o -name "*.yml" | xargs -I {} sh -c 'echo "Validating {}" && cat {} | grep -q "apiVersion" || (echo "Invalid YAML: {}" && exit 1)'
+        else
+          echo "No examples directory found, skipping validation."
+        fi
+
+  build:
+    runs-on: ubuntu-latest
+    needs: [test, validate-examples]
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24'
+    - name: Build Crossplane Provider
+      run: |
+        mkdir -p dist
+        GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} make build
+        BINARY_NAME="provider-nutanix_${{ matrix.goos }}_${{ matrix.goarch }}"
+        cp bin/provider dist/$BINARY_NAME
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: provider-binaries-${{ matrix.goos }}-${{ matrix.goarch }}
+        path: dist/provider-nutanix_${{ matrix.goos }}_${{ matrix.goarch }}*
+
+  package:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24'
+    - name: Install Upbound CLI
+      run: |
+        curl -sL https://cli.upbound.io | sh
+        sudo mv up /usr/local/bin/
+    - name: Build provider binary
+      run: make build
+    - name: Copy provider binary to package
+      run: cp bin/provider package/
+    - name: Build Crossplane package
+      run: |
+        VERSION=${GITHUB_REF_NAME:-$(git rev-parse --short HEAD)}
+        echo "Building package version: $VERSION"
+        up xpkg build --package-root=package --output=provider-nutanix-${VERSION}.xpkg
+    - name: Upload package artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: crossplane-package
+        path: provider-nutanix-*.xpkg
+
+  release:
+    if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24'
+    - name: Build all platforms
+      run: |
+        mkdir -p dist
+        GOOS=linux GOARCH=amd64 make build
+        cp bin/provider dist/provider-nutanix_linux_amd64
+        GOOS=linux GOARCH=arm64 make build
+        cp bin/provider dist/provider-nutanix_linux_arm64
+        GOOS=darwin GOARCH=amd64 make build
+        cp bin/provider dist/provider-nutanix_darwin_amd64
+        GOOS=darwin GOARCH=arm64 make build
+        cp bin/provider dist/provider-nutanix_darwin_arm64
+    - name: Install Upbound CLI
+      run: |
+        curl -sL https://cli.upbound.io | sh
+        sudo mv up /usr/local/bin/
+    - name: Build Crossplane package
+      run: |
+        make build
+        cp bin/provider package/
+        VERSION=${GITHUB_REF_NAME#v}
+        echo "Building package version: $VERSION"
+        up xpkg build --package-root=package --output=provider-nutanix-${VERSION}.xpkg
+        cp provider-nutanix-${VERSION}.xpkg dist/
+    - name: Prepare release assets
+      run: |
+        cd dist
+        for file in provider-nutanix_*; do
+          if [[ "$file" != *.xpkg ]]; then
+            tar -czf "$file.tar.gz" "$file"
+            rm "$file"
+          fi
+        done
+        sha256sum *.{tar.gz,xpkg} > provider-nutanix_SHA256SUMS
+        ls -la
+    - name: Upload Release Assets
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          dist/*.tar.gz
+          dist/*.xpkg
+          dist/provider-nutanix_SHA256SUMS
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish-to-upbound:
+    if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    needs: release
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24'
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    - name: Install Upbound CLI
+      run: |
+        curl -sL https://cli.upbound.io | sh
+        sudo mv up /usr/local/bin/
+    - name: Login to Upbound
+      run: |
+        echo "Logging in to Upbound..."
+        up login --username="${{ secrets.UPBOUND_ACCESS_ID }}" --password="${{ secrets.UPBOUND_TOKEN }}"
+        echo "Login successful"
+        up profile current
+      env:
+        UPBOUND_ACCESS_ID: ${{ secrets.UPBOUND_ACCESS_ID }}
+        UPBOUND_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
+    - name: Build and push Docker image to GitHub Container Registry
+      run: |
+        VERSION=${GITHUB_REF_NAME#v}
+        echo "Building Docker image version: $VERSION"
+        echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+        docker buildx create --use --name multi-platform-builder
+        docker buildx build \
+          --platform linux/amd64,linux/arm64 \
+          --tag ghcr.io/mgeorge67701/provider-nutanix:${VERSION} \
+          --tag ghcr.io/mgeorge67701/provider-nutanix:latest \
+          --push \
+          .
+        echo "Multi-platform Docker image pushed: ghcr.io/mgeorge67701/provider-nutanix:${VERSION}"
+    - name: Build Crossplane package
+      run: |
+        make build
+        cp bin/provider package/
+        VERSION=${GITHUB_REF_NAME#v}
+        echo "Building package version: $VERSION"
+        echo "Package will be built as: provider-nutanix-${VERSION}.xpkg"
+        sed -i "s|image:.*|image: ghcr.io/mgeorge67701/provider-nutanix:${VERSION}|" package/crossplane.yaml
+        up xpkg build --package-root=package --output=provider-nutanix-${VERSION}.xpkg
+        ls -la provider-nutanix-${VERSION}.xpkg
+        echo "Package size: $(du -h provider-nutanix-${VERSION}.xpkg)"
+    - name: Login to Upbound
+      run: |
+        echo "Logging in to Upbound..."
+        up login --username="${{ secrets.UPBOUND_ACCESS_ID }}" --password="${{ secrets.UPBOUND_TOKEN }}"
+        echo "Login successful"
+        up profile current
+      env:
+        UPBOUND_ACCESS_ID: ${{ secrets.UPBOUND_ACCESS_ID }}
+        UPBOUND_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
+    - name: Verify package and repository
+      run: |
+        VERSION=${GITHUB_REF_NAME#v}
+        echo "Verifying package file exists..."
+        ls -la provider-nutanix-${VERSION}.xpkg
+        echo "Checking repository access..."
+        up repository list | grep provider-nutanix || echo "Repository not found, will be created automatically"
+        echo "Current user context:"
+        up profile current
+        echo "Ready to push package: xpkg.upbound.io/mgeorge67701/provider-nutanix:${VERSION}"
+    - name: Push to Upbound Marketplace
+      run: |
+        VERSION=${GITHUB_REF_NAME#v}
+        echo "Pushing package version: ${VERSION}"
+        echo "Full ref name: ${GITHUB_REF_NAME}"
+        up xpkg push xpkg.upbound.io/mgeorge67701/provider-nutanix:${VERSION} -f provider-nutanix-${VERSION}.xpkg
+        echo "Successfully pushed version ${VERSION}"
+        if [[ ! "${VERSION}" =~ (alpha|beta|rc) ]]; then
+          echo "Pushing as latest..."
+          up xpkg push xpkg.upbound.io/mgeorge67701/provider-nutanix:latest -f provider-nutanix-${VERSION}.xpkg
+          echo "Successfully pushed as latest"
+        fi
+    - name: Update repository publish policy
+      run: |
+        echo "Updating repository publish policy..."
+        up repository update provider-nutanix --publish --private=false || echo "Repository update failed, continuing..."
+        echo "Repository update completed"
