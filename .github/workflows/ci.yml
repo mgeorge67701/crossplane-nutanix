@@ -175,8 +175,8 @@ jobs:
         sudo mv up /usr/local/bin/
     - name: Build Crossplane package
       run: |
-        make build
-        cp bin/provider package/
+        # Build Linux/amd64 binary for the package
+        make copy-provider
         VERSION=${GITHUB_REF_NAME#v}
         echo "Building package version: $VERSION"
         up xpkg build --package-root=package --output=provider-nutanix-${VERSION}.xpkg
@@ -230,8 +230,7 @@ jobs:
     - name: Build and push Docker image to GitHub Container Registry
       run: |
         VERSION=${GITHUB_REF_NAME#v}
-        echo "Building Docker image version: $VERSION"
-        make build
+        echo "Building multi-platform Docker image version: $VERSION"
         echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
         docker buildx create --use --name multi-platform-builder
         docker buildx build \
@@ -243,8 +242,7 @@ jobs:
         echo "Multi-platform Docker image pushed: ghcr.io/mgeorge67701/provider-nutanix:${VERSION}"
     - name: Build Crossplane package
       run: |
-        make build
-        cp bin/provider package/
+        make copy-provider
         VERSION=${GITHUB_REF_NAME#v}
         echo "Building package version: $VERSION"
         echo "Package will be built as: provider-nutanix-${VERSION}.xpkg"
