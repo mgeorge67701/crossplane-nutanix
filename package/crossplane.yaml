@@ -24,6 +24,107 @@ metadata:
       - Advanced usage patterns and compositions
       
       All examples are included in this package for immediate use!
+    meta.crossplane.io/readme: |
+      # Nutanix Crossplane Provider
+
+      This provider enables management of Nutanix infrastructure resources through Crossplane.
+
+      ## Quick Start
+
+      ### 1. Create Credentials Secret
+
+      ```bash
+      kubectl create secret generic nutanix-creds -n crossplane-system \
+        --from-literal=credentials='{"endpoint":"https://prism-central.example.com:9440","username":"admin","password":"your-password"}'
+      ```
+
+      ### 2. Apply ProviderConfig
+
+      ```yaml
+      apiVersion: nutanix.crossplane.io/v1beta1
+      kind: ProviderConfig
+      metadata:
+        name: default
+      spec:
+        credentials:
+          source: Secret
+          secretRef:
+            namespace: crossplane-system
+            name: nutanix-creds
+            key: credentials
+      ```
+
+      ### 3. Create Virtual Machine
+
+      ```yaml
+      apiVersion: nutanix.crossplane.io/v1alpha1
+      kind: VirtualMachine
+      metadata:
+        name: example-vm
+      spec:
+        name: "my-crossplane-vm"
+        numVcpus: 2
+        memorySizeMib: 4096
+        clusterUuid: "00000000-0000-0000-0000-000000000000"  # Replace with your cluster UUID
+        subnetUuid: "11111111-1111-1111-1111-111111111111"   # Replace with your subnet UUID
+        imageUuid: "22222222-2222-2222-2222-222222222222"    # Replace with your image UUID
+      ```
+
+      ## Finding UUIDs
+
+      To find the required UUIDs for your Nutanix environment:
+
+      - **Cluster UUID**: Prism Central → Home → Infrastructure → Clusters
+      - **Subnet UUID**: Prism Central → Home → Networking → Subnets
+      - **Image UUID**: Prism Central → Home → Compute & Storage → Images
+
+      ## Examples
+
+      This package includes comprehensive examples in the `examples/` directory:
+
+      - `providerconfig.yaml`: Basic ProviderConfig setup
+      - `virtualmachine.yaml`: Virtual machine creation example
+
+      ## Advanced Usage
+
+      ### Compositions
+
+      You can create reusable compositions to simplify VM creation:
+
+      ```yaml
+      apiVersion: apiextensions.crossplane.io/v1
+      kind: Composition
+      metadata:
+        name: web-server-vm
+      spec:
+        compositeTypeRef:
+          apiVersion: example.com/v1alpha1
+          kind: WebServerVM
+        resources:
+        - name: vm
+          base:
+            apiVersion: nutanix.crossplane.io/v1alpha1
+            kind: VirtualMachine
+            spec:
+              numVcpus: 2
+              memorySizeMib: 4096
+          patches:
+          - type: FromCompositeFieldPath
+            fromFieldPath: spec.clusterUuid
+            toFieldPath: spec.clusterUuid
+      ```
+
+      ## Support
+
+      For issues and questions:
+      - GitHub Issues: https://github.com/mgeorge67701/provider-nutanix/issues
+      - Crossplane Slack: https://slack.crossplane.io/
+
+      ## Resources
+
+      - [Nutanix Documentation](https://portal.nutanix.com/page/documents)
+      - [Crossplane Documentation](https://docs.crossplane.io/)
+      - [Provider Source Code](https://github.com/mgeorge67701/provider-nutanix)
 spec:
   controller:
     image: ghcr.io/mgeorge67701/provider-nutanix:latest

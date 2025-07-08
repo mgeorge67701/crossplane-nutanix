@@ -1,0 +1,9 @@
+<svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <rect width="64" height="64" rx="8" fill="#1f77b4"/>
+  <rect x="8" y="8" width="48" height="48" rx="4" fill="#ffffff" opacity="0.9"/>
+  <rect x="12" y="12" width="40" height="8" rx="2" fill="#1f77b4"/>
+  <rect x="12" y="24" width="40" height="8" rx="2" fill="#1f77b4"/>
+  <rect x="12" y="36" width="40" height="8" rx="2" fill="#1f77b4"/>
+  <rect x="12" y="48" width="40" height="4" rx="2" fill="#1f77b4" opacity="0.6"/>
+  <text x="32" y="35" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" font-weight="bold" fill="#1f77b4">N</text>
+</svg>
