@@ -31,7 +31,7 @@ type ProviderConfig struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   ProviderConfigSpec   `json:"spec"`
+	Spec   ProviderConfigSpec        `json:"spec"`
 	Status xpv1.ProviderConfigStatus `json:"status,omitempty"`
 }
 

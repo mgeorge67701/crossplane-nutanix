@@ -1,8 +1,8 @@
 package v1alpha1
 
 import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/scheme"
@@ -10,19 +10,19 @@ import (
 
 // VirtualMachineSpec defines the desired state of a Nutanix VM.
 type VirtualMachineSpec struct {
-	Name           string `json:"name"`
-	NumVCPUs       int    `json:"numVcpus"`
-	MemorySizeMiB  int    `json:"memorySizeMib"`
-	ClusterUUID    string `json:"clusterUuid"`
-	SubnetUUID     string `json:"subnetUuid"`
-	ImageUUID      string `json:"imageUuid"`
+	Name          string `json:"name"`
+	NumVCPUs      int    `json:"numVcpus"`
+	MemorySizeMiB int    `json:"memorySizeMib"`
+	ClusterUUID   string `json:"clusterUuid"`
+	SubnetUUID    string `json:"subnetUuid"`
+	ImageUUID     string `json:"imageUuid"`
 }
 
 // VirtualMachineStatus defines the observed state of a Nutanix VM.
 type VirtualMachineStatus struct {
 	xpv1.ConditionedStatus `json:",inline"`
-	VMID                  string `json:"vmId,omitempty"`
-	State                 string `json:"state,omitempty"`
+	VMID                   string `json:"vmId,omitempty"`
+	State                  string `json:"state,omitempty"`
 }
 
 // +kubebuilder:object:root=true

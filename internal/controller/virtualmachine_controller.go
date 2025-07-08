@@ -9,11 +9,11 @@ import (
 	"github.com/crossplane/provider-nutanix/apis/v1alpha1"
 	"github.com/crossplane/provider-nutanix/apis/v1beta1"
 	"github.com/crossplane/provider-nutanix/internal/nutanix"
+	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	corev1 "k8s.io/api/core/v1"
 )
 
 type VirtualMachineReconciler struct {
