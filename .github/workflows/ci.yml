@@ -260,7 +260,10 @@ jobs:
         echo "Verifying package file exists..."
         ls -la provider-nutanix-${VERSION}.xpkg
         echo "Checking repository access..."
-        up repository list | grep provider-nutanix || echo "Repository not found, will be created automatically"
+        if ! up repository list | grep -q provider-nutanix; then
+          echo "Repository not found, creating it..."
+          up repository create provider-nutanix --publish
+        fi
         echo "Current user context:"
         up profile current
         echo "Ready to push package: xpkg.upbound.io/mgeorge67701/provider-nutanix:${VERSION}"
