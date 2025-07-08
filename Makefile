@@ -5,6 +5,10 @@ GOARCH ?= amd64
 # Default target
 .DEFAULT_GOAL := build
 
+# Generate code (required by CI)
+generate:
+	@echo "No code generation needed"
+
 # Build for current platform
 build:
 	@mkdir -p bin
@@ -44,4 +48,4 @@ help:
 	@echo "  build-all     - Build for all platforms"
 	@echo "  copy-provider - Copy provider binary to package directory"
 
-.PHONY: build build-macbook build-linux build-pi5 build-all package-dir copy-provider help
+.PHONY: generate build build-macbook build-linux build-pi5 build-all package-dir copy-provider help
