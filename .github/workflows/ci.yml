@@ -129,10 +129,8 @@ jobs:
       run: |
         curl -sL https://cli.upbound.io | sh
         sudo mv up /usr/local/bin/
-    - name: Build provider binary
-      run: make build
-    - name: Copy provider binary to package
-      run: cp bin/provider package/
+    - name: Build provider binary and copy to package
+      run: make copy-provider
     - name: Build Crossplane package
       run: |
         VERSION=${GITHUB_REF_NAME:-$(git rev-parse --short HEAD)}
