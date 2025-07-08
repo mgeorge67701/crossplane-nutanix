@@ -53,7 +53,7 @@ func (r *VirtualMachineReconciler) Reconcile(ctx context.Context, req reconcile.
 	}
 	ntxCli := nutanix.NewClient(creds.Endpoint, creds.Username, creds.Password, creds.Insecure)
 
-	if !vm.ObjectMeta.DeletionTimestamp.IsZero() {
+	if !vm.DeletionTimestamp.IsZero() {
 		// Handle delete
 		if err := ntxCli.DeleteVM(ctx, vm.Status.VMID); err != nil {
 			r.log.Debug("Failed to delete VM", "error", err)
