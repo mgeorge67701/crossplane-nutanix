@@ -22,6 +22,20 @@ type VirtualMachineReconciler struct {
 	log logging.Logger
 }
 
+// Function to fetch cluster UUID dynamically from Nutanix
+func fetchClusterUUID(ntxCli *nutanix.Client, clusterName string) (string, error) {
+	clusters, err := ntxCli.ListClusters()
+	if err != nil {
+		return "", err
+	}
+	for _, cluster := range clusters {
+		if cluster.Name == clusterName {
+			return cluster.UUID, nil
+		}
+	}
+	return "", fmt.Errorf("cluster with name %s not found", clusterName)
+}
+
 // Function to dynamically select and parse JSON file based on cluster name
 func readClusterDetailsByName(clusterName string) (map[string]string, error) {
 	filePath := fmt.Sprintf("/etc/provider/%s.json", clusterName)
@@ -99,14 +113,14 @@ func (r *VirtualMachineReconciler) Reconcile(ctx context.Context, req reconcile.
 		return reconcile.Result{}, fmt.Errorf("cluster name is required")
 	}
 
-	// Read cluster details from the corresponding JSON file
+	// Fetch cluster details dynamically from JSON file
 	clusterDetails, err := readClusterDetailsByName(clusterName)
 	if err != nil {
 		r.log.Debug("Failed to read cluster details", "error", err)
 		return reconcile.Result{}, err
 	}
 
-	// Use clusterDetails dynamically
+	// Use extracted values dynamically
 	vm.Spec.ClusterUUID = clusterDetails["clusterUuid"]
 	vm.Spec.SubnetUUID = clusterDetails["subnetUuid"]
 	vm.Spec.ImageUUID = clusterDetails["imageUuid"]

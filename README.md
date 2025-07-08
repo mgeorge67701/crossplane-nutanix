@@ -111,9 +111,9 @@ The ProviderConfig resource configures authentication to your Nutanix cluster:
 - **Endpoint configuration**: Prism Central URL
 - **Multiple configurations**: Support for multiple Nutanix environments
 
-## Using a JSON File for Cluster Details
+## Using a JSON File for Dynamic Values
 
-You can store cluster UUIDs and other details in a JSON file and mount it into the provider pod. The provider will read this file at runtime.
+You can store various dynamic values such as `clusterUuid`, `subnetUuid`, `imageUuid`, and others in a JSON file and mount it into the provider pod. The provider will read this file at runtime.
 
 ### Example JSON File
 
@@ -121,7 +121,9 @@ You can store cluster UUIDs and other details in a JSON file and mount it into t
 {
   "clusterUuid": "00000000-0000-0000-0000-000000000000",
   "subnetUuid": "11111111-1111-1111-1111-111111111111",
-  "imageUuid": "22222222-2222-2222-2222-222222222222"
+  "imageUuid": "22222222-2222-2222-2222-222222222222",
+  "networkUuid": "33333333-3333-3333-3333-333333333333",
+  "storageUuid": "44444444-4444-4444-4444-444444444444"
 }
 ```
 
@@ -130,8 +132,8 @@ You can store cluster UUIDs and other details in a JSON file and mount it into t
 Create a ConfigMap with the JSON file:
 
 ```bash
-kubectl create configmap cluster-details -n crossplane-system \
-  --from-file=cluster-details.json=/path/to/cluster-details.json
+kubectl create configmap dynamic-values -n crossplane-system \
+  --from-file=dynamic-values.json=/path/to/dynamic-values.json
 ```
 
 Update the provider deployment to mount the ConfigMap:
@@ -147,15 +149,141 @@ spec:
       containers:
       - name: provider
         volumeMounts:
-        - name: cluster-details
+        - name: dynamic-values
           mountPath: /etc/provider
       volumes:
-      - name: cluster-details
+      - name: dynamic-values
         configMap:
-          name: cluster-details
+          name: dynamic-values
 ```
 
-The provider will automatically read the JSON file from `/etc/provider/cluster-details.json` and use the values dynamically.
+The provider will automatically read the JSON file from `/etc/provider/dynamic-values.json` and use the values dynamically.
+
+## Using a JSON File for Network Details
+
+You can store network-related values such as `domain`, `nameserver`, `gateway`, `network`, and others in a JSON file and mount it into the provider pod. The provider will read this file at runtime.
+
+### Example JSON File for Network Details
+
+```json
+{
+    "domain": "saas-p.com",
+    "nameserver": "10.222.1.210",
+    "gateway": "10.222.192.1",
+    "network": "10.222.192.0/24",
+    "subnet": "ch01_BTIQ_App",
+    "email": "globalengineering-teamatlasbottomline.com@bottomline.com",
+    "puppet_master": "puppet-ch01-pr.saas-p.com",
+    "network_management_server": "us-00-vl-mgt001.saas-p.com",
+    "foreman_host": "ch01vlfrmn01.saas-p.com"
+}
+```
+
+### Mounting the JSON File for Network Details
+
+Create a ConfigMap with the JSON file:
+
+```bash
+kubectl create configmap network-details -n crossplane-system \
+  --from-file=network-details.json=/path/to/network-details.json
+```
+
+Update the provider deployment to mount the ConfigMap:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: provider-nutanix
+spec:
+  template:
+    spec:
+      containers:
+      - name: provider
+        volumeMounts:
+        - name: network-details
+          mountPath: /etc/provider
+      volumes:
+      - name: network-details
+        configMap:
+          name: network-details
+```
+
+The provider will automatically read the JSON file from `/etc/provider/network-details.json` and use the values dynamically.
+
+## Nutanix Prism v3 API Calls
+
+The Nutanix Prism v3 API provides a comprehensive set of endpoints for managing Nutanix infrastructure. Below are some key API calls:
+
+### Virtual Machines
+
+- **Create a VM**: `POST /vms`
+
+- **Get VM Details**: `GET /vms/{uuid}`
+
+- **Update a VM**: `PUT /vms/{uuid}`
+
+- **Delete a VM**: `DELETE /vms/{uuid}`
+
+### Subnets
+
+- **Create a Subnet**: `POST /subnets`
+
+- **Get Subnet Details**: `GET /subnets/{uuid}`
+
+- **Update a Subnet**: `PUT /subnets/{uuid}`
+
+- **Delete a Subnet**: `DELETE /subnets/{uuid}`
+
+### Clusters
+
+- **Get Cluster Details**: `GET /clusters/{uuid}`
+
+- **List Clusters**: `POST /clusters/list`
+
+### Images
+
+- **Create an Image**: `POST /images`
+
+- **Get Image Details**: `GET /images/{uuid}`
+
+- **Update an Image**: `PUT /images/{uuid}`
+
+- **Delete an Image**: `DELETE /images/{uuid}`
+
+### VPN Gateways
+
+- **Create a VPN Gateway**: `POST /vpn_gateways`
+
+- **Get VPN Gateway Details**: `GET /vpn_gateways/{uuid}`
+
+- **Update a VPN Gateway**: `PUT /vpn_gateways/{uuid}`
+
+- **Delete a VPN Gateway**: `DELETE /vpn_gateways/{uuid}`
+
+### Recovery Plans
+
+- **Create a Recovery Plan**: `POST /recovery_plans`
+
+- **Get Recovery Plan Details**: `GET /recovery_plans/{uuid}`
+
+- **Update a Recovery Plan**: `PUT /recovery_plans/{uuid}`
+
+- **Delete a Recovery Plan**: `DELETE /recovery_plans/{uuid}`
+
+### User Management
+
+- **Create a User**: `POST /users`
+
+- **Get User Details**: `GET /users/{uuid}`
+
+- **Update a User**: `PUT /users/{uuid}`
+
+- **Delete a User**: `DELETE /users/{uuid}`
+
+### Additional Resources
+
+For a complete list of API calls, refer to the [Nutanix Prism v3 API Documentation](https://www.nutanix.dev/api_reference/apis/prism_v3.html).
 
 ## Development
 
@@ -195,6 +323,7 @@ This provider is available on Upbound Marketplace:
 🏪 **[Upbound Marketplace](https://marketplace.upbound.io/providers/mgeorge67701/provider-nutanix)**
 
 Install directly with:
+
 ```bash
 kubectl apply -f - <<EOF
 apiVersion: pkg.crossplane.io/v1

@@ -39,3 +39,18 @@ func (c *Client) DeleteVM(ctx context.Context, vmID string) error {
 	// TODO: Implement actual Nutanix API call
 	return nil
 }
+
+// ListClusters fetches the list of clusters from Nutanix Prism Central.
+func (c *Client) ListClusters() ([]struct {
+	Name string
+	UUID string
+}, error) {
+	// TODO: Implement actual Nutanix API call to fetch clusters
+	return []struct {
+		Name string
+		UUID string
+	}{
+		{Name: "ch01-aza-ntnx-01", UUID: "00000000-0000-0000-0000-000000000000"},
+		{Name: "ch02-aza-ntnx-02", UUID: "11111111-1111-1111-1111-111111111111"},
+	}, nil
+}
