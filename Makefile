@@ -7,3 +7,6 @@ build:
 package-dir:
 	@if [ -f package ]; then rm -f package; fi
 	@mkdir -p package
+
+copy-provider: package-dir build
+	cp bin/provider package/
