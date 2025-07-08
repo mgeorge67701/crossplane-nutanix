@@ -1,0 +1,3 @@
+resources:
+- nutanix.crossplane.io_virtualmachines.yaml
+- nutanix.crossplane.io_providerconfigs.yaml

@@ -1,0 +1,14 @@
+apiVersion: meta.pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-nutanix
+  annotations:
+    meta.crossplane.io/maintainer: Crossplane Community <info@crossplane.io>
+    meta.crossplane.io/source: github.com/crossplane/provider-nutanix
+    meta.crossplane.io/license: Apache-2.0
+    meta.crossplane.io/description: |
+      The Nutanix Crossplane provider enables infrastructure management on
+      Nutanix clusters.
+spec:
+  controller:
+    image: ghcr.io/mgeorge67701/provider-nutanix:latest
