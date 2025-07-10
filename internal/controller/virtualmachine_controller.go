@@ -183,23 +183,12 @@ func (r *VirtualMachineReconciler) Reconcile(ctx context.Context, req reconcile.
 
 	// If ClusterUUID is not set but ClusterName is, resolve the latest matching cluster
 	if vm.Spec.ClusterUUID == "" && vm.Spec.ClusterName != "" {
-		clusters, err := ntxCli.ListClusters()
+		clusterUUID, err := fetchClusterUUID(ntxCli, vm.Spec.ClusterName)
 		if err != nil {
-			r.log.Debug("Failed to list clusters", "error", err)
-			return reconcile.Result{}, err
-		}
-		var latestCluster *struct{ Name, UUID string }
-		for _, cl := range clusters {
-			if cl.Name != "" && vm.Spec.ClusterName != "" && containsIgnoreCase(cl.Name, vm.Spec.ClusterName) {
-				// No creation time in stub, just pick the first match for now
-				latestCluster = &cl
-			}
-		}
-		if latestCluster == nil {
-			r.log.Debug("No matching cluster found for partial name", "clusterName", vm.Spec.ClusterName)
+			r.log.Debug("No matching cluster found for name", "clusterName", vm.Spec.ClusterName, "error", err)
 			return reconcile.Result{}, fmt.Errorf("no cluster found matching name: %s", vm.Spec.ClusterName)
 		}
-		vm.Spec.ClusterUUID = latestCluster.UUID
+		vm.Spec.ClusterUUID = clusterUUID
 	}
 
 	// Resolve additionalDisks image UUIDs if needed
