@@ -27,18 +27,49 @@ metadata:
     meta.crossplane.io/readme: |
       # Nutanix Crossplane Provider
 
-      This provider enables management of Nutanix infrastructure resources through Crossplane.
+      A Crossplane provider for managing Nutanix infrastructure resources through Kubernetes APIs.
+
+      [![CI](https://github.com/mgeorge67701/provider-nutanix/actions/workflows/ci.yml/badge.svg)](https://github.com/mgeorge67701/provider-nutanix/actions/workflows/ci.yml)
+      [![Upbound Marketplace](https://img.shields.io/badge/Upbound-Marketplace-blue)](https://marketplace.upbound.io/providers/mgeorge67701/provider-nutanix)
+
+      ## Features
+
+      - **Virtual Machines**: Create and manage Nutanix VMs with configurable CPU, memory, and storage
+      - **Provider Configuration**: Secure authentication with Nutanix Prism Central
+      - **Crossplane Integration**: Full integration with Crossplane compositions and composite resources
 
       ## Quick Start
 
-      ### 1. Create Credentials Secret
+      ### Prerequisites
+
+      - Kubernetes cluster with [Crossplane](https://crossplane.io/) installed
+      - Nutanix Prism Central access with admin credentials
+
+      ### Installation
+
+      Install the provider from Upbound Marketplace:
+
+      ```bash
+      kubectl apply -f - <<EOF
+      apiVersion: pkg.crossplane.io/v1
+      kind: Provider
+      metadata:
+        name: provider-nutanix
+      spec:
+        package: xpkg.upbound.io/mgeorge67701/provider-nutanix:latest
+      EOF
+      ```
+
+      ### Configuration
+
+      Create a secret with your Nutanix credentials:
 
       ```bash
       kubectl create secret generic nutanix-creds -n crossplane-system \
         --from-literal=credentials='{"endpoint":"https://prism-central.example.com:9440","username":"admin","password":"your-password"}'
       ```
 
-      ### 2. Apply ProviderConfig
+      Create a ProviderConfig:
 
       ```yaml
       apiVersion: nutanix.crossplane.io/v1beta1
@@ -54,7 +85,9 @@ metadata:
             key: credentials
       ```
 
-      ### 3. Create Virtual Machine
+      ## Usage Examples
+
+      ### Create a Virtual Machine
 
       ```yaml
       apiVersion: nutanix.crossplane.io/v1alpha1
@@ -65,9 +98,16 @@ metadata:
         name: "my-crossplane-vm"
         numVcpus: 2
         memorySizeMib: 4096
-        clusterUuid: "00000000-0000-0000-0000-000000000000"  # Replace with your cluster UUID
-        subnetUuid: "11111111-1111-1111-1111-111111111111"   # Replace with your subnet UUID
-        imageUuid: "22222222-2222-2222-2222-222222222222"    # Replace with your image UUID
+        clusterName: "aza-ntnx-01"
+        imageName: "ubuntu-22.04-cloud"
+        additionalDisks:
+          - deviceIndex: 1
+            sizeGb: 20
+          - deviceIndex: 2
+            sizeGb: 100
+        externalFacts:
+          bt_product: "inf"
+          another_fact: "value"
       ```
 
       ## Finding UUIDs

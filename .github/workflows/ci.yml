@@ -136,8 +136,8 @@ jobs:
       run: |
         curl -sL https://cli.upbound.io | sh
         sudo mv up /usr/local/bin/
-    - name: Build provider binary and copy to package
-      run: make copy-provider
+    - name: Sync README.md to crossplane.yaml annotation
+      run: bash scripts/sync-readme.sh
     - name: Build Crossplane package
       run: |
         VERSION=${GITHUB_REF_NAME:-$(git rev-parse --short HEAD)}
