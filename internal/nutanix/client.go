@@ -50,7 +50,7 @@ func (c *Client) CreateVM(ctx context.Context, spec interface{}) (string, error)
 		disks = append(disks, map[string]interface{}{
 			"deviceIndex": 0,
 			"sizeGb":      vmSpec.MemorySizeMiB, // Example, real size should be from image or spec
-			"imageUuid":  vmSpec.ImageUUID,
+			"imageUuid":   vmSpec.ImageUUID,
 		})
 	}
 	// Additional disks
