@@ -112,11 +112,11 @@ metadata:
 
       ## Finding UUIDs
 
-      To find the required UUIDs for your Nutanix environment:
+      You can still look up UUIDs manually in Prism Central if needed:
 
       - **Cluster UUID**: Prism Central → Home → Infrastructure → Clusters
-      - **Subnet UUID**: Prism Central → Home → Networking → Subnets
-      - **Image UUID**: Prism Central → Home → Compute & Storage → Images
+      - **Subnet UUID**: Prism Central → Network & Security → Subnets
+      - **Image UUID**: Prism Central → Compute & Storage → Images
 
       ## Examples
 
