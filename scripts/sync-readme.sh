@@ -17,17 +17,32 @@ fi
 INDENT="      "
 ESCAPED_README=$(sed "s/^/${INDENT}/" "$README_PATH")
 
-# Replace the entire readme annotation block, regardless of previous content
-awk -v readme="$ESCAPED_README" '
-  BEGIN {in_readme=0}
-  /^\s*meta\.crossplane\.io\/readme:/ {
-    print "    meta.crossplane.io/readme: |"
-    print readme
-    in_readme=1
-    next
-  }
-  in_readme && /^\s*[^ ]/ {in_readme=0}
-  !in_readme {print}
-' "$CROSSPLANE_YAML" > "$CROSSPLANE_YAML.tmp" && mv "$CROSSPLANE_YAML.tmp" "$CROSSPLANE_YAML"
+# Check if the annotation exists
+if grep -q '^\s*meta\.crossplane\.io/readme:' "$CROSSPLANE_YAML"; then
+  # Replace the entire readme annotation block, regardless of previous content
+  awk -v readme="$ESCAPED_README" '
+    BEGIN {in_readme=0}
+    /^\s*meta\.crossplane\.io\/readme:/ {
+      print "    meta.crossplane.io/readme: |"
+      print readme
+      in_readme=1
+      next
+    }
+    in_readme && (/^\s*\S/ && !/^\s{6,}/) {in_readme=0}
+    !in_readme {print}
+    in_readme && /^\s{6,}/ {next}
+  ' "$CROSSPLANE_YAML" > "$CROSSPLANE_YAML.tmp" && mv "$CROSSPLANE_YAML.tmp" "$CROSSPLANE_YAML"
+else
+  # Insert the annotation under the annotations: key
+  awk -v readme="$ESCAPED_README" '
+    /^\s*annotations:/ {
+      print
+      print "    meta.crossplane.io/readme: |"
+      print readme
+      next
+    }
+    {print}
+  ' "$CROSSPLANE_YAML" > "$CROSSPLANE_YAML.tmp" && mv "$CROSSPLANE_YAML.tmp" "$CROSSPLANE_YAML"
+fi
 
 echo "README.md content fully synced to crossplane.yaml annotation."
