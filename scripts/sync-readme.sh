@@ -13,16 +13,21 @@ if [ ! -f "$CROSSPLANE_YAML" ]; then
   exit 1
 fi
 
-# Escape the README for YAML block literal
-ESCAPED_README=$(awk '{print "      "$0}' "$README_PATH")
+# Prepare the README as a YAML block literal (indented 6 spaces)
+INDENT="      "
+ESCAPED_README=$(sed "s/^/${INDENT}/" "$README_PATH")
 
-# Replace the annotation in crossplane.yaml
-awk -v r="\n$ESCAPED_README" '
+# Use awk to replace the entire readme annotation block
+awk -v readme="$ESCAPED_README" '
   BEGIN {in_readme=0}
-  /meta.crossplane.io\/readme:/ {print; in_readme=1; next}
-  in_readme && /^\s*[^ ]/ {in_readme=0}
+  /^ {4}meta\.crossplane\.io\/readme:/ {
+    print "    meta.crossplane.io/readme: |"
+    print readme
+    in_readme=1
+    next
+  }
+  in_readme && /^ {4}[^ ]/ {in_readme=0}
   !in_readme {print}
-  in_readme && /^\s*[^ ]/ {print r; in_readme=0}
 ' "$CROSSPLANE_YAML" > "$CROSSPLANE_YAML.tmp" && mv "$CROSSPLANE_YAML.tmp" "$CROSSPLANE_YAML"
 
 echo "README.md content synced to crossplane.yaml annotation."
