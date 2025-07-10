@@ -13,10 +13,22 @@ type VirtualMachineSpec struct {
 	Name          string `json:"name"`
 	NumVCPUs      int    `json:"numVcpus"`
 	MemorySizeMiB int    `json:"memorySizeMib"`
-	ClusterUUID   string `json:"clusterUuid"`
-	SubnetUUID    string `json:"subnetUuid"`
-	ImageUUID     string `json:"imageUuid"`
-	ClusterName   string `json:"clusterName"`
+	ClusterUUID   string `json:"clusterUuid,omitempty"`
+	ClusterName   string `json:"clusterName,omitempty"`
+	SubnetUUID    string `json:"subnetUuid,omitempty"`
+	SubnetName    string `json:"subnetName,omitempty"`
+	ImageUUID     string `json:"imageUuid,omitempty"`
+	ImageName     string `json:"imageName,omitempty"`
+	AdditionalDisks []DiskSpec `json:"additionalDisks,omitempty"`
+	ExternalFacts map[string]string `json:"externalFacts,omitempty"`
+}
+
+// DiskSpec defines the disk configuration for a Nutanix VM.
+type DiskSpec struct {
+	DeviceIndex int    `json:"deviceIndex"`
+	SizeGb      int    `json:"sizeGb"`
+	ImageUUID   string `json:"imageUuid,omitempty"`
+	ImageName   string `json:"imageName,omitempty"`
 }
 
 // VirtualMachineStatus defines the observed state of a Nutanix VM.

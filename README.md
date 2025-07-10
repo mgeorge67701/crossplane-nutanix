@@ -72,17 +72,93 @@ spec:
   numVcpus: 2
   memorySizeMib: 4096
   clusterName: "aza-ntnx-01"  # Specify the cluster name to fetch details dynamically
+  imageName: "ubuntu-22.04-cloud"
 ```
 
-The provider will automatically fetch the `clusterUuid`, `subnetUuid`, and `imageUuid` from the JSON file corresponding to the specified `clusterName`. Ensure the JSON file is mounted in the provider pod at `/etc/provider/<cluster-name>.json`.
+The provider will automatically resolve the `clusterUuid`, `subnetUuid`, and `imageUuid` from the names you provide in the spec. You can specify either the UUID or a partial name for each resource (cluster, subnet, image). If you specify a partial name (e.g., `clusterName`, `subnetName`, `imageName`), the provider will search Nutanix Prism Central for resources whose names contain the given string and select the latest available match. You do **not** need to mount or manage any JSON files for UUID lookup; all lookups are performed dynamically using the Nutanix API.
+
+### Specifying the Image
+
+You can specify the image by name in your `VirtualMachine` spec. The provider will automatically fetch the corresponding image UUID from Nutanix Prism Central using the API, so you do not need to specify the UUID directly.
+
+```yaml
+spec:
+  clusterName: "aza-ntnx-01"
+  imageName: "ubuntu-22.04-cloud"
+```
+
+The provider will use the `imageName` to look up the image UUID at runtime, just like it does for the cluster name. This makes your manifests more portable and easier to maintain.
+
+> **Note:** The image UUID will be resolved automatically; you only need to provide the image name.
+
+### Specifying the Image (Automatic Latest Selection)
+
+You can specify a partial image name (e.g., `rhel8`, `rhel9`, `win2022`, `win2019`) in your `VirtualMachine` spec. The provider will automatically search for images in Nutanix Prism Central whose names contain the given string and select the latest available image (by creation date or version) for you.
+
+```yaml
+spec:
+  clusterName: "aza-ntnx-01"
+  imageName: "rhel8"   # Will pick the latest RHEL 8 image available
+```
+
+You can use this for any OS family or version:
+- `imageName: "rhel9"` will pick the latest RHEL 9 image
+- `imageName: "win2022"` will pick the latest Windows Server 2022 image
+- `imageName: "win2019"` will pick the latest Windows Server 2019 image
+
+> **Note:** The provider will resolve the latest matching image automatically. You do not need to specify the full image name or UUID.
+
+### Specifying Additional Disks
+
+You can specify additional disks for your Virtual Machine in the `additionalDisks` section of the spec. Each disk can have a `deviceIndex` and `sizeGb` specified.
+
+```yaml
+apiVersion: nutanix.crossplane.io/v1alpha1
+kind: VirtualMachine
+metadata:
+  name: example-vm
+spec:
+  name: "my-crossplane-vm"
+  numVcpus: 2
+  memorySizeMib: 4096
+  clusterName: "aza-ntnx-01"
+  imageName: "ubuntu-22.04-cloud"
+  additionalDisks:
+    - deviceIndex: 1
+      sizeGb: 20
+    - deviceIndex: 2
+      sizeGb: 100
+  externalFacts:
+    bt_product: "inf"
+    another_fact: "value"
+```
+
+In this example, two additional disks are specified: one with `deviceIndex` 1 and size 20 GB, and another with `deviceIndex` 2 and size 100 GB. The `deviceIndex` specifies the order in which the disks are attached to the VM.
+
+In this example, `externalFacts` allows you to pass arbitrary key-value pairs to the VM, similar to Terraform's `external_facts` map. These facts can be used for configuration management or automation tools running inside the VM.
 
 ## Finding UUIDs
 
-To find the required UUIDs for your Nutanix environment:
+You can still look up UUIDs manually in Prism Central if needed:
 
 - **Cluster UUID**: Prism Central → Home → Infrastructure → Clusters
 - **Subnet UUID**: Prism Central → Network & Security → Subnets
 - **Image UUID**: Prism Central → Compute & Storage → Images
+
+## Example: Fetching Cluster, Subnet, and Image UUIDs from Nutanix
+
+You only need to provide the partial name in your `VirtualMachine` spec. The provider will automatically fetch the corresponding UUID from Nutanix Prism Central using the API, so you do not need to specify the UUID in any JSON file.
+
+```yaml
+spec:
+  clusterName: "aza-ntnx-01"
+  subnetName: "prod-subnet"
+  imageName: "rhel8"
+```
+
+The provider will use the partial names to look up the UUIDs at runtime. This is similar to how Terraform data sources work, where you reference a resource by name and the provider resolves the UUID for you.
+
+> **Note:** You do not need to create or mount a JSON file for cluster, subnet, or image UUID lookup. The provider will fetch the UUIDs directly from Nutanix using the names you specify in your resource spec.
 
 ## Examples
 

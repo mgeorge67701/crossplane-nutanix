@@ -36,18 +36,29 @@ func fetchClusterUUID(ntxCli *nutanix.Client, clusterName string) (string, error
 	return "", fmt.Errorf("cluster with name %s not found", clusterName)
 }
 
-// Function to dynamically select and parse JSON file based on cluster name
-func readClusterDetailsByName(clusterName string) (map[string]string, error) {
-	filePath := fmt.Sprintf("/etc/provider/%s.json", clusterName)
+// Function to dynamically select and parse JSON file based on a resource name (e.g., cluster name)
+func readDetailsByName(resourceType, resourceName string) (map[string]interface{}, error) {
+	filePath := fmt.Sprintf("/etc/provider/%s-%s.json", resourceType, resourceName)
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, err
 	}
-	var details map[string]string
+	var details map[string]interface{}
 	if err := json.Unmarshal(data, &details); err != nil {
 		return nil, err
 	}
 	return details, nil
+}
+
+// Helper to get a value by key from the details map
+func getValue(details map[string]interface{}, key string) (string, error) {
+	if v, ok := details[key]; ok {
+		if s, ok := v.(string); ok {
+			return s, nil
+		}
+		return "", fmt.Errorf("value for key '%s' is not a string", key)
+	}
+	return "", fmt.Errorf("key '%s' not found in details", key)
 }
 
 func (r *VirtualMachineReconciler) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
@@ -114,16 +125,106 @@ func (r *VirtualMachineReconciler) Reconcile(ctx context.Context, req reconcile.
 	}
 
 	// Fetch cluster details dynamically from JSON file
-	clusterDetails, err := readClusterDetailsByName(clusterName)
+	clusterDetails, err := readDetailsByName("cluster", clusterName)
 	if err != nil {
 		r.log.Debug("Failed to read cluster details", "error", err)
 		return reconcile.Result{}, err
 	}
+	clusterUuid, err := getValue(clusterDetails, "uuid")
+	if err != nil {
+		r.log.Debug("Failed to get cluster uuid from details", "error", err)
+		return reconcile.Result{}, err
+	}
+	vm.Spec.ClusterUUID = clusterUuid
 
-	// Use extracted values dynamically
-	vm.Spec.ClusterUUID = clusterDetails["clusterUuid"]
-	vm.Spec.SubnetUUID = clusterDetails["subnetUuid"]
-	vm.Spec.ImageUUID = clusterDetails["imageUuid"]
+	// If ImageUUID is not set but ImageName is, resolve the latest matching image
+	if vm.Spec.ImageUUID == "" && vm.Spec.ImageName != "" {
+		images, err := ntxCli.ListImages(ctx)
+		if err != nil {
+			r.log.Debug("Failed to list images", "error", err)
+			return reconcile.Result{}, err
+		}
+		var latestImage *nutanix.ImageInfo
+		for _, img := range images {
+			if img.Name != "" && vm.Spec.ImageName != "" && containsIgnoreCase(img.Name, vm.Spec.ImageName) {
+				if latestImage == nil || img.CreatedTime > latestImage.CreatedTime {
+					latestImage = &img
+				}
+			}
+		}
+		if latestImage == nil {
+			r.log.Debug("No matching image found for partial name", "imageName", vm.Spec.ImageName)
+			return reconcile.Result{}, fmt.Errorf("no image found matching name: %s", vm.Spec.ImageName)
+		}
+		vm.Spec.ImageUUID = latestImage.UUID
+	}
+
+	// If SubnetUUID is not set but SubnetName is, resolve the latest matching subnet
+	if vm.Spec.SubnetUUID == "" && vm.Spec.SubnetName != "" {
+		subnets, err := ntxCli.ListSubnets(ctx)
+		if err != nil {
+			r.log.Debug("Failed to list subnets", "error", err)
+			return reconcile.Result{}, err
+		}
+		var latestSubnet *nutanix.SubnetInfo
+		for _, sn := range subnets {
+			if sn.Name != "" && vm.Spec.SubnetName != "" && containsIgnoreCase(sn.Name, vm.Spec.SubnetName) {
+				if latestSubnet == nil || sn.CreatedTime > latestSubnet.CreatedTime {
+					latestSubnet = &sn
+				}
+			}
+		}
+		if latestSubnet == nil {
+			r.log.Debug("No matching subnet found for partial name", "subnetName", vm.Spec.SubnetName)
+			return reconcile.Result{}, fmt.Errorf("no subnet found matching name: %s", vm.Spec.SubnetName)
+		}
+		vm.Spec.SubnetUUID = latestSubnet.UUID
+	}
+
+	// If ClusterUUID is not set but ClusterName is, resolve the latest matching cluster
+	if vm.Spec.ClusterUUID == "" && vm.Spec.ClusterName != "" {
+		clusters, err := ntxCli.ListClusters()
+		if err != nil {
+			r.log.Debug("Failed to list clusters", "error", err)
+			return reconcile.Result{}, err
+		}
+		var latestCluster *struct{ Name, UUID string }
+		for _, cl := range clusters {
+			if cl.Name != "" && vm.Spec.ClusterName != "" && containsIgnoreCase(cl.Name, vm.Spec.ClusterName) {
+				// No creation time in stub, just pick the first match for now
+				latestCluster = &cl
+			}
+		}
+		if latestCluster == nil {
+			r.log.Debug("No matching cluster found for partial name", "clusterName", vm.Spec.ClusterName)
+			return reconcile.Result{}, fmt.Errorf("no cluster found matching name: %s", vm.Spec.ClusterName)
+		}
+		vm.Spec.ClusterUUID = latestCluster.UUID
+	}
+
+	// Resolve additionalDisks image UUIDs if needed
+	for i, disk := range vm.Spec.AdditionalDisks {
+		if disk.ImageUUID == "" && disk.ImageName != "" {
+			images, err := ntxCli.ListImages(ctx)
+			if err != nil {
+				r.log.Debug("Failed to list images for additional disk", "error", err)
+				return reconcile.Result{}, err
+			}
+			var latestImage *nutanix.ImageInfo
+			for _, img := range images {
+				if img.Name != "" && disk.ImageName != "" && containsIgnoreCase(img.Name, disk.ImageName) {
+					if latestImage == nil || img.CreatedTime > latestImage.CreatedTime {
+						latestImage = &img
+					}
+				}
+			}
+			if latestImage == nil {
+				r.log.Debug("No matching image found for additional disk partial name", "imageName", disk.ImageName)
+				return reconcile.Result{}, fmt.Errorf("no image found matching name for additional disk: %s", disk.ImageName)
+			}
+			vm.Spec.AdditionalDisks[i].ImageUUID = latestImage.UUID
+		}
+	}
 
 	// Handle observe
 	_, err = ntxCli.GetVM(ctx, vm.Status.VMID)
@@ -132,6 +233,12 @@ func (r *VirtualMachineReconciler) Reconcile(ctx context.Context, req reconcile.
 		return reconcile.Result{}, err
 	}
 	return reconcile.Result{}, nil
+}
+
+// containsIgnoreCase checks if s contains substr, case-insensitive
+func containsIgnoreCase(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || (len(substr) > 0 && containsIgnoreCase(s[1:], substr))) ||
+		(len(substr) > 0 && (len(s) > 0 && (s[0]|32) == (substr[0]|32) && containsIgnoreCase(s[1:], substr[1:])))
 }
 
 func SetupVirtualMachine(mgr manager.Manager, l logging.Logger) error {
