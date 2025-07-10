@@ -13,8 +13,13 @@ if [ -z "$UPBOUND_TOKEN" ]; then
   exit 1
 fi
 
-VERSIONS=$(curl -s -H "Authorization: Bearer $UPBOUND_TOKEN" \
-  "$UPBOUND_API/orgs/$ORG/repos/$REPO/versions" | jq -r '.versions[].version')
+# DEBUG: Print the raw API response
+RAW_JSON=$(curl -s -H "Authorization: Bearer $UPBOUND_TOKEN" \
+  "$UPBOUND_API/orgs/$ORG/repos/$REPO/versions")
+echo "Raw API response:" >&2
+echo "$RAW_JSON" | jq . >&2
+
+VERSIONS=$(echo "$RAW_JSON" | jq -r '.versions[].version')
 
 TOTAL=$(echo "$VERSIONS" | wc -l | tr -d ' ')
 DELETE_COUNT=$((TOTAL - KEEP))
