@@ -307,4 +307,4 @@ jobs:
         UPBOUND_ACCESS_ID: ${{ secrets.UPBOUND_ACCESS_ID }}
         UPBOUND_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
     - name: Cleanup old Upbound package versions (keep latest 3)
-      run: bash scripts/cleanup-old-upbound-versions.sh
+      run: bash scripts/cleanup-old-upbound-versions-api.sh
