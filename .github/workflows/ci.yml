@@ -234,25 +234,26 @@ jobs:
       env:
         UPBOUND_ACCESS_ID: ${{ secrets.UPBOUND_ACCESS_ID }}
         UPBOUND_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
-    - name: Build and push Docker image to Upbound Registry
+    - name: Build and push Docker image to GitHub Container Registry
       run: |
         VERSION=${GITHUB_REF_NAME#v}
         echo "Building multi-platform Docker image version: $VERSION"
-        echo "${{ secrets.UPBOUND_TOKEN }}" | docker login xpkg.upbound.io -u "${{ secrets.UPBOUND_ACCESS_ID }}" --password-stdin
+        echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
         docker buildx create --use --name multi-platform-builder
         docker buildx build \
           --platform linux/amd64,linux/arm64 \
-          --tag xpkg.upbound.io/crossplane-terraform/provider-nutanix:${VERSION} \
-          --tag xpkg.upbound.io/crossplane-terraform/provider-nutanix:latest \
+          --tag ghcr.io/mgeorge67701/provider-nutanix:${VERSION} \
+          --tag ghcr.io/mgeorge67701/provider-nutanix:latest \
           --push \
           .
-        echo "Multi-platform Docker image pushed: xpkg.upbound.io/crossplane-terraform/provider-nutanix:${VERSION}"
+        echo "Multi-platform Docker image pushed: ghcr.io/mgeorge67701/provider-nutanix:${VERSION}"
     - name: Build Crossplane package
       run: |
         make copy-provider
         VERSION=${GITHUB_REF_NAME#v}
         echo "Building package version: $VERSION"
         echo "Package will be built as: provider-nutanix-${VERSION}.xpkg"
+        sed -i "s|image:.*|image: ghcr.io/mgeorge67701/provider-nutanix:${VERSION}|" package/crossplane.yaml
         
         bash scripts/sync-readme.sh
         up xpkg build --package-root=package --output=provider-nutanix-${VERSION}.xpkg
@@ -279,17 +280,17 @@ jobs:
         fi
         echo "Current user context:"
         up profile current
-        echo "Ready to push package: xpkg.upbound.io/crossplane-terraform/provider-nutanix:${VERSION}"
+        echo "Ready to push package: xpkg.upbound.io/mgeorge67701/provider-nutanix:${VERSION}"
     - name: Push to Upbound Marketplace
       run: |
         VERSION=${GITHUB_REF_NAME#v}
         echo "Pushing package version: ${VERSION}"
         echo "Full ref name: ${GITHUB_REF_NAME}"
-        up xpkg push xpkg.upbound.io/crossplane-terraform/provider-nutanix:${VERSION} -f provider-nutanix-${VERSION}.xpkg
+        up xpkg push xpkg.upbound.io/mgeorge67701/provider-nutanix:${VERSION} -f provider-nutanix-${VERSION}.xpkg
         echo "Successfully pushed version ${VERSION}"
         if [[ ! "${VERSION}" =~ (alpha|beta|rc) ]]; then
           echo "Pushing as latest..."
-          up xpkg push xpkg.upbound.io/crossplane-terraform/provider-nutanix:latest -f provider-nutanix-${VERSION}.xpkg
+          up xpkg push xpkg.upbound.io/mgeorge67701/provider-nutanix:latest -f provider-nutanix-${VERSION}.xpkg
           echo "Successfully pushed as latest"
         fi
     - name: Update repository publish policy
