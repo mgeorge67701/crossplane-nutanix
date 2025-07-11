@@ -38,8 +38,7 @@ EOF
 Create a secret with your Nutanix credentials (e.g., `nutanix-creds-default`):
 
 ```bash
-kubeclt create secret generic nutanix-creds-default -n crossplane-system \
-  --from-literal=credentials='{"endpoint":"https://default-pc.example.com:9440","username":"admin","password":"your-password","insecure":true}'
+kubeclt create secret generic nutanix-creds-default -n crossplane-system --from-literal=credentials='{"endpoint":"https://<default-prism-central-endpoint>:9440","username":"<default-username>","password":"<default-password>","insecure":true}'
 ```
 
 For datacenter-specific credentials (e.g., for `dc-alpha`):
@@ -264,15 +263,15 @@ You can store network-related values such as `domain`, `nameserver`, `gateway`, 
 
 ```json
 {
-    "domain": "saas-p.com",
-    "nameserver": "10.222.1.210",
-    "gateway": "10.222.192.1",
-    "network": "10.222.192.0/24",
-    "subnet": "ch01_BTIQ_App",
-    "email": "globalengineering-teamatlasbottomline.com@bottomline.com",
-    "puppet_master": "puppet-ch01-pr.saas-p.com",
-    "network_management_server": "us-00-vl-mgt001.saas-p.com",
-    "foreman_host": "ch01vlfrmn01.saas-p.com"
+    "domain": "example.com",
+    "nameserver": "1.2.3.4",
+    "gateway": "192.168.1.1",
+    "network": "192.168.1.0/24",
+    "subnet": "example_subnet",
+    "email": "user@example.com",
+    "puppet_master": "puppet.example.com",
+    "network_management_server": "mgmt.example.com",
+    "foreman_host": "foreman.example.com"
 }
 ```
 
