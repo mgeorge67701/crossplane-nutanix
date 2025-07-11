@@ -177,7 +177,13 @@ jobs:
       run: |
         # Build Linux/amd64 binary for the package
         make copy-provider
+        echo "--- Content of package/crossplane.yaml BEFORE sync ---"
+        cat package/crossplane.yaml
+        echo "--- Content of README.md ---"
+        cat README.md
         bash scripts/sync-readme.sh # Added: Sync README.md to crossplane.yaml annotation
+        echo "--- Content of package/crossplane.yaml AFTER sync ---"
+        cat package/crossplane.yaml
         VERSION=${GITHUB_REF_NAME#v}
         echo "Building package version: $VERSION"
         up xpkg build --package-root=package --output=provider-nutanix-${VERSION}.xpkg
