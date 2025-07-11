@@ -71,9 +71,28 @@ func (r *VirtualMachineReconciler) Reconcile(ctx context.Context, req reconcile.
 
 	// Load ProviderConfig
 	var pc v1beta1.ProviderConfig
+	// Assuming the provider config is named "default", adjust if necessary
 	if err := r.Get(ctx, client.ObjectKey{Name: "default"}, &pc); err != nil {
 		return reconcile.Result{}, err
 	}
+
+	// LoB validation logic
+	if pc.Spec.IsLoBMandatory && vm.Spec.LoB == "" {
+		return reconcile.Result{}, fmt.Errorf("LoB is mandatory but not provided")
+	}
+	if vm.Spec.LoB != "" {
+		found := false
+		for _, allowedLoB := range pc.Spec.AllowedLoBs {
+			if vm.Spec.LoB == allowedLoB {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return reconcile.Result{}, fmt.Errorf("LoB value '%s' is not in the allowed list: %v", vm.Spec.LoB, pc.Spec.AllowedLoBs)
+		}
+	}
+
 	if pc.Spec.Credentials.Source != "Secret" {
 		return reconcile.Result{}, fmt.Errorf("only Secret credentials source is supported")
 	}

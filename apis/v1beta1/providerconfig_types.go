@@ -39,6 +39,14 @@ type ProviderConfig struct {
 type ProviderConfigSpec struct {
 	// Credentials required to authenticate to this provider.
 	Credentials ProviderCredentials `json:"credentials"`
+
+	// AllowedLoBs is the list of allowed Line of Business values for VMs.
+	// +optional
+	AllowedLoBs []string `json:"allowedLobs,omitempty"`
+
+	// IsLoBMandatory specifies whether the LoB field is mandatory for VMs.
+	// +optional
+	IsLoBMandatory bool `json:"isLobMandatory,omitempty"`
 }
 
 // ProviderCredentials required to authenticate.
