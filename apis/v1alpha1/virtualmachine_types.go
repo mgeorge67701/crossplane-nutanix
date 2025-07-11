@@ -12,6 +12,7 @@ import (
 type VirtualMachineSpec struct {
 	Name            string            `json:"name"`
 	LoB             string            `json:"lob,omitempty"`
+	Datacenter      string            `json:"datacenter,omitempty"`
 	NumVCPUs        int               `json:"numVcpus"`
 	MemorySizeMiB   int               `json:"memorySizeMib"`
 	ClusterUUID     string            `json:"clusterUuid,omitempty"`

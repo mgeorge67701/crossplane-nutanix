@@ -93,12 +93,28 @@ func (r *VirtualMachineReconciler) Reconcile(ctx context.Context, req reconcile.
 		}
 	}
 
-	if pc.Spec.Credentials.Source != "Secret" {
+	// Determine which credentials to use
+	var currentCreds v1beta1.ProviderCredentials
+	if vm.Spec.Datacenter != "" {
+		if dcCreds, ok := pc.Spec.DatacenterCredentials[vm.Spec.Datacenter]; ok {
+			currentCreds = dcCreds
+		} else {
+			// Fallback to default credentials if datacenter-specific not found
+			currentCreds = pc.Spec.Credentials
+			r.log.Debug("Datacenter-specific credentials not found, falling back to default", "datacenter", vm.Spec.Datacenter)
+		}
+	} else {
+		// Use default credentials if no datacenter is specified
+		currentCreds = pc.Spec.Credentials
+	}
+
+	if currentCreds.Source != "Secret" {
 		return reconcile.Result{}, fmt.Errorf("only Secret credentials source is supported")
 	}
-	ref := pc.Spec.Credentials.SecretRef
+	secretRef := currentCreds.SecretRef
+
 	var secret corev1.Secret
-	if err := r.Get(ctx, client.ObjectKey{Namespace: ref.Namespace, Name: ref.Name}, &secret); err != nil {
+	if err := r.Get(ctx, client.ObjectKey{Namespace: secretRef.Namespace, Name: secretRef.Name}, &secret); err != nil {
 		return reconcile.Result{}, err
 	}
 	creds := struct {
@@ -107,10 +123,29 @@ func (r *VirtualMachineReconciler) Reconcile(ctx context.Context, req reconcile.
 		Password string `json:"password"`
 		Insecure bool   `json:"insecure"`
 	}{}
-	if err := json.Unmarshal(secret.Data[ref.Key], &creds); err != nil {
+	if err := json.Unmarshal(secret.Data[secretRef.Key], &creds); err != nil {
 		return reconcile.Result{}, err
 	}
-	ntxCli := nutanix.NewClient(creds.Endpoint, creds.Username, creds.Password, creds.Insecure)
+
+	// Determine the Prism Central endpoint to use
+	var prismCentralEndpoint string
+	if vm.Spec.Datacenter != "" {
+		if len(pc.Spec.PrismCentralEndpoints) == 0 {
+			return reconcile.Result{}, fmt.Errorf("datacenter specified in VM spec, but no PrismCentralEndpoints configured in ProviderConfig")
+		}
+		var ok bool
+		prismCentralEndpoint, ok = pc.Spec.PrismCentralEndpoints[vm.Spec.Datacenter]
+		if !ok {
+			return reconcile.Result{}, fmt.Errorf("datacenter '%s' not found in ProviderConfig's PrismCentralEndpoints map", vm.Spec.Datacenter)
+		}
+	} else if creds.Endpoint != "" {
+		// Fallback to direct endpoint from credentials if no datacenter is specified
+		prismCentralEndpoint = creds.Endpoint
+	} else {
+		return reconcile.Result{}, fmt.Errorf("no datacenter specified in VM spec and no default endpoint in credentials")
+	}
+
+	ntxCli := nutanix.NewClient(prismCentralEndpoint, creds.Username, creds.Password, creds.Insecure)
 
 	if !vm.DeletionTimestamp.IsZero() {
 		// Handle delete

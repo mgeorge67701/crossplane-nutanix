@@ -47,6 +47,16 @@ type ProviderConfigSpec struct {
 	// IsLoBMandatory specifies whether the LoB field is mandatory for VMs.
 	// +optional
 	IsLoBMandatory bool `json:"isLobMandatory,omitempty"`
+
+	// PrismCentralEndpoints maps datacenter names to their Prism Central endpoints.
+	// This allows dynamic selection of the Prism Central based on the datacenter specified in the VM spec.
+	// +optional
+	PrismCentralEndpoints map[string]string `json:"prismCentralEndpoints,omitempty"`
+
+	// DatacenterCredentials maps datacenter names to their specific credentials.
+	// This allows using different credentials for different Prism Central instances.
+	// +optional
+	DatacenterCredentials map[string]ProviderCredentials `json:"datacenterCredentials,omitempty"`
 }
 
 // ProviderCredentials required to authenticate.

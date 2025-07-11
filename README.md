@@ -35,27 +35,35 @@ EOF
 
 ### Configuration
 
-Create a secret with your Nutanix credentials:
+Create a secret with your Nutanix credentials (e.g., `nutanix-creds-default`):
 
 ```bash
-kubectl create secret generic nutanix-creds -n crossplane-system \
-  --from-literal=credentials='{"endpoint":"https://prism-central.example.com:9440","username":"admin","password":"your-password"}'
+kubeclt create secret generic nutanix-creds-default -n crossplane-system \
+  --from-literal=credentials='{"endpoint":"https://default-pc.example.com:9440","username":"admin","password":"your-password","insecure":true}'
 ```
 
-Create a ProviderConfig:
+For datacenter-specific credentials (e.g., for `dc-alpha`):
+
+```bash
+kubeclt create secret generic nutanix-creds-alpha -n crossplane-system \
+  --from-literal=credentials='{"endpoint":"https://pc-alpha.example.com:9440","username":"admin-alpha","password":"your-password-alpha","insecure":true}'
+```
+
+Create a ProviderConfig that combines all features, including LoB validation, dynamic endpoint selection, and datacenter-specific credentials. A comprehensive example is available in [`examples/providerconfig-all-features.yaml`](./examples/providerconfig-all-features.yaml).
 
 ```yaml
 apiVersion: nutanix.crossplane.io/v1beta1
 kind: ProviderConfig
 metadata:
-  name: default
+  name: all-features-config
 spec:
   credentials:
     source: Secret
     secretRef:
       namespace: crossplane-system
-      name: nutanix-creds
+      name: nutanix-creds-default
       key: credentials
+  # ... (rest of the configuration as in examples/providerconfig-all-features.yaml)
 ```
 
 ## Usage Examples
@@ -82,33 +90,7 @@ The provider will automatically resolve the `clusterUuid`, `subnetUuid`, and `im
 
 The `VirtualMachine` resource includes an optional `lob` field in its `spec`. This field allows you to associate a Line of Business with your virtual machines. The validation rules for this field are configured in the `ProviderConfig`.
 
-**Configuring LoB Validation in ProviderConfig:**
-
-Your `ProviderConfig` can define a list of `allowedLoBs` and specify whether the `lob` field is `isLoBMandatory`.
-
-```yaml
-apiVersion: nutanix.crossplane.io/v1beta1
-kind: ProviderConfig
-metadata:
-  name: default
-spec:
-  credentials:
-    source: Secret
-    secretRef:
-      namespace: crossplane-system
-      name: nutanix-creds
-      key: credentials
-  allowedLoBs:
-    - BTC
-    - BTIQ
-    - CLOUD
-    # ... other allowed LoB values
-  isLoBMandatory: true # Set to true to make LoB field mandatory
-```
-
-- If `isLoBMandatory` is set to `true`, the `lob` field must be provided in the `VirtualMachine` spec.
-- If a `lob` value is provided, it must be one of the values listed in `allowedLoBs`.
-- If `isLoBMandatory` is `false` (or omitted), the `lob` field is optional. If provided, it will still be validated against `allowedLoBs`.
+Refer to the `allowedLoBs` and `isLoBMandatory` fields in the [`examples/providerconfig-all-features.yaml`](./examples/providerconfig-all-features.yaml) for a comprehensive example of how to configure LoB validation.
 
 ### Specifying the Image
 
@@ -170,6 +152,12 @@ In this example, two additional disks are specified: one with `deviceIndex` 1 an
 
 In this example, `externalFacts` allows you to pass arbitrary key-value pairs to the VM, similar to Terraform's `external_facts` map. These facts can be used for configuration management or automation tools running inside the VM.
 
+### Dynamic Prism Central Endpoint Selection
+
+The provider supports dynamic selection of the Prism Central endpoint and associated credentials based on a `datacenter` field specified in the `VirtualMachine` spec. This allows you to manage VMs across multiple Nutanix environments from a single Crossplane provider instance.
+
+Refer to the `prismCentralEndpoints` and `datacenterCredentials` fields in the [`examples/providerconfig-all-features.yaml`](./examples/providerconfig-all-features.yaml) for a comprehensive example of how to configure dynamic endpoint and credential selection.
+
 ## Finding UUIDs
 
 You can still look up UUIDs manually in Prism Central if needed:
@@ -195,11 +183,11 @@ The provider will use the partial names to look up the UUIDs at runtime. This is
 
 ## Examples
 
-Complete examples are available in the [`examples/`](./examples) directory:
+Complete examples demonstrating all features are available in the [`examples/`](./examples) directory:
 
-- Basic VirtualMachine and ProviderConfig examples
-- Advanced Composition and XRD patterns
-- Automated setup script for quick installation
+- [`providerconfig-all-features.yaml`](./examples/providerconfig-all-features.yaml): A comprehensive ProviderConfig example showcasing LoB validation, dynamic endpoint selection, and datacenter-specific credentials.
+- [`virtualmachine.yaml`](./examples/virtualmachine.yaml): A basic VirtualMachine example.
+- [`virtualmachine-advanced.yaml`](./examples/virtualmachine-advanced.yaml): An advanced VirtualMachine example including additional disks and external facts.
 
 ## Resources
 

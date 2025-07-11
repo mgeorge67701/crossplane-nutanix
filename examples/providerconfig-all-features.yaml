@@ -1,0 +1,49 @@
+apiVersion: nutanix.crossplane.io/v1beta1
+kind: ProviderConfig
+metadata:
+  name: all-features-config
+spec:
+  # Default credentials for the provider. These are used if no datacenter-specific
+  # credentials are provided or if no datacenter is specified in the VM spec.
+  credentials:
+    source: Secret
+    secretRef:
+      namespace: crossplane-system
+      name: nutanix-creds-default
+      key: credentials
+
+  # Configure LoB (Line of Business) validation for VirtualMachines.
+  # If 'isLoBMandatory' is true, the 'lob' field in VirtualMachine spec is required.
+  # If 'lob' is provided, its value must be one of the 'allowedLoBs'.
+  allowedLoBs:
+    - CLOUD
+    - SECURITY
+    - DEV
+    - PROD
+  isLoBMandatory: true # Set to false if LoB field should be optional
+
+  # Define Prism Central endpoints for different datacenters.
+  # The provider will use the 'datacenter' field in the VirtualMachine spec
+  # to select the appropriate endpoint from this map.
+  prismCentralEndpoints:
+    dc-alpha: "https://pc-alpha.example.com:9440"
+    dc-beta: "https://pc-beta.example.com:9440"
+    dc-gamma: "https://pc-gamma.example.com:9440"
+
+  # Define datacenter-specific credentials.
+  # These credentials will override the default 'credentials' for the specified datacenter.
+  # If a datacenter is specified in the VM, the provider will first look for
+  # credentials here. If not found, it falls back to the default credentials.
+  datacenterCredentials:
+    dc-alpha:
+      source: Secret
+      secretRef:
+        namespace: crossplane-system
+        name: nutanix-creds-alpha
+        key: credentials
+    dc-beta:
+      source: Secret
+      secretRef:
+        namespace: crossplane-system
+        name: nutanix-creds-beta
+        key: credentials

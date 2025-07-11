@@ -1,0 +1,26 @@
+apiVersion: nutanix.crossplane.io/v1alpha1
+kind: VirtualMachine
+metadata:
+  name: example-vm-advanced
+spec:
+  forProvider:
+    name: "my-advanced-crossplane-vm"
+    numVcpus: 4
+    memorySizeMib: 8192
+    clusterName: "aza-ntnx-01"
+    datacenter: "dc-beta" # Specify the datacenter for Prism Central endpoint selection
+    imageName: "rhel8" # Example: partial image name, provider selects latest RHEL 8
+    subnetName: "my-network-subnet"
+    lob: "SECURITY" # Example: another valid LoB from ProviderConfig
+    additionalDisks:
+      - deviceIndex: 1
+        sizeGb: 50
+        imageName: "data-disk-template" # Optional: use an image for the disk
+      - deviceIndex: 2
+        sizeGb: 100
+    externalFacts:
+      environment: "production"
+      application: "webserver"
+      owner: "devops-team"
+  providerConfigRef:
+    name: all-features-config
