@@ -73,9 +73,42 @@ spec:
   memorySizeMib: 4096
   clusterName: "aza-ntnx-01"  # Specify the cluster name to fetch details dynamically
   imageName: "ubuntu-22.04-cloud"
+  lob: "CLOUD" # Example: Specify the Line of Business
 ```
 
 The provider will automatically resolve the `clusterUuid`, `subnetUuid`, and `imageUuid` from the names you provide in the spec. You can specify either the UUID or a partial name for each resource (cluster, subnet, image). If you specify a partial name (e.g., `clusterName`, `subnetName`, `imageName`), the provider will search Nutanix Prism Central for resources whose names contain the given string and select the latest available match. You do **not** need to mount or manage any JSON files for UUID lookup; all lookups are performed dynamically using the Nutanix API.
+
+### Line of Business (LoB) Validation
+
+The `VirtualMachine` resource includes an optional `lob` field in its `spec`. This field allows you to associate a Line of Business with your virtual machines. The validation rules for this field are configured in the `ProviderConfig`.
+
+**Configuring LoB Validation in ProviderConfig:**
+
+Your `ProviderConfig` can define a list of `allowedLoBs` and specify whether the `lob` field is `isLoBMandatory`.
+
+```yaml
+apiVersion: nutanix.crossplane.io/v1beta1
+kind: ProviderConfig
+metadata:
+  name: default
+spec:
+  credentials:
+    source: Secret
+    secretRef:
+      namespace: crossplane-system
+      name: nutanix-creds
+      key: credentials
+  allowedLoBs:
+    - BTC
+    - BTIQ
+    - CLOUD
+    # ... other allowed LoB values
+  isLoBMandatory: true # Set to true to make LoB field mandatory
+```
+
+- If `isLoBMandatory` is set to `true`, the `lob` field must be provided in the `VirtualMachine` spec.
+- If a `lob` value is provided, it must be one of the values listed in `allowedLoBs`.
+- If `isLoBMandatory` is `false` (or omitted), the `lob` field is optional. If provided, it will still be validated against `allowedLoBs`.
 
 ### Specifying the Image
 
