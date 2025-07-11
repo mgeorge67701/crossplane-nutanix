@@ -167,4 +167,4 @@ metadata:
       - [Provider Source Code](https://github.com/mgeorge67701/provider-nutanix)
 spec:
   controller:
-    image: ghcr.io/mgeorge67701/provider-nutanix:latest
+    image: xpkg.upbound.io/crossplane-terraform/provider-nutanix:latest
