@@ -254,6 +254,7 @@ jobs:
         echo "Building package version: $VERSION"
         echo "Package will be built as: provider-nutanix-${VERSION}.xpkg"
         sed -i "s|image:.*|image: ghcr.io/mgeorge67701/provider-nutanix:${VERSION}|" package/crossplane.yaml
+        bash scripts/sync-readme.sh
         up xpkg build --package-root=package --output=provider-nutanix-${VERSION}.xpkg
         ls -la provider-nutanix-${VERSION}.xpkg
         echo "Package size: $(du -h provider-nutanix-${VERSION}.xpkg)"
