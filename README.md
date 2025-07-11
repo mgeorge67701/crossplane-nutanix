@@ -264,13 +264,13 @@ You can store network-related values such as `domain`, `nameserver`, `gateway`, 
 ```json
 {
     "domain": "example.com",
-    "nameserver": "1.2.3.4",
-    "gateway": "192.168.1.1",
+    "nameserver": "192.168.1.1",
+    "gateway": "192.168.1.254",
     "network": "192.168.1.0/24",
-    "subnet": "example_subnet",
-    "email": "user@example.com",
+    "subnet": "example-subnet",
+    "email": "admin@example.com",
     "puppet_master": "puppet.example.com",
-    "network_management_server": "mgmt.example.com",
+    "network_management_server": "nms.example.com",
     "foreman_host": "foreman.example.com"
 }
 ```
