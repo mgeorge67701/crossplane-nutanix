@@ -5,6 +5,19 @@ A Crossplane provider for managing Nutanix infrastructure resources through Kube
 [![CI](https://github.com/mgeorge67701/provider-nutanix/actions/workflows/ci.yml/badge.svg)](https://github.com/mgeorge67701/provider-nutanix/actions/workflows/ci.yml)
 [![Upbound Marketplace](https://img.shields.io/badge/Upbound-Marketplace-blue)](https://marketplace.upbound.io/providers/mgeorge67701/provider-nutanix)
 
+## Table of Contents
+- [Features](#features)
+- [Quick Start](#quick-start)
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [Usage Examples](#usage-examples)
+- [FAQ](#faq)
+- [Development](#development)
+- [CI/CD](#cicd)
+- [Marketplace](#marketplace)
+- [Contributing](#contributing)
+- [License](#license)
+- [Contact & Support](#contact--support)
 ## Features
 
 - **Virtual Machines**: Create and manage Nutanix VMs with configurable CPU, memory, and storage
@@ -100,10 +113,10 @@ spec:
   availabilityZoneMappingURL: https://example.com/az-to-cluster.csv
 ```
 
+
 ## Usage Examples
 
-
-## Complete VirtualMachine Example
+### Complete VirtualMachine Example
 
 Below is a full example of a VirtualMachine resource using all common fields, including dynamic datacenter selection, LoB, additional disks, and external facts. You do **not** need to provide UUIDs or JSON files for normal use—just use names or partial names, and the provider will resolve everything automatically.
 
@@ -160,7 +173,7 @@ spec:
 
 ---
 
-## ProviderConfig Example (Multi-Datacenter)
+### ProviderConfig Example (Multi-Datacenter)
 
 > 
 > `datacenter 'dc-gamma' is not allowed. Allowed values: [dc-alpha dc-beta]`
@@ -224,14 +237,14 @@ A: No, unless you have a special use case for dynamic values or network details.
 
 ---
 
-## More Examples
+### More Examples
 
 See the [`examples/`](./examples) directory for:
 - [`providerconfig-all-features.yaml`](./examples/providerconfig-all-features.yaml): Full ProviderConfig with LoB validation and multi-datacenter.
 - [`virtualmachine.yaml`](./examples/virtualmachine.yaml): Basic VM.
 - [`virtualmachine-advanced.yaml`](./examples/virtualmachine-advanced.yaml): Advanced VM with disks and facts.
 
-## Examples
+### Examples
 
 Complete examples demonstrating all features are available in the [`examples/`](./examples) directory:
 
@@ -262,7 +275,7 @@ The ProviderConfig resource configures authentication to your Nutanix cluster:
 
 You can store various dynamic values such as `clusterUuid`, `subnetUuid`, `imageUuid`, and others in a JSON file and mount it into the provider pod. The provider will read this file at runtime.
 
-### Example JSON File
+#### Example JSON File
 
 ```json
 {
@@ -274,7 +287,7 @@ You can store various dynamic values such as `clusterUuid`, `subnetUuid`, `image
 }
 ```
 
-### Mounting the JSON File
+#### Mounting the JSON File
 
 Create a ConfigMap with the JSON file:
 
@@ -311,7 +324,7 @@ The provider will automatically read the JSON file from `/etc/provider/dynamic-v
 You can store network-related values such as `domain`, `nameserver`, `gateway`, `network`, and others in a JSON file and mount it into the provider pod. The provider will read this file at runtime.
 
 
-### Example JSON File for Network Details (with Subnet Access Control)
+#### Example JSON File for Network Details (with Subnet Access Control)
 
 ```json
 {
@@ -355,7 +368,7 @@ spec:
 - Use `allowed_repos` in your subnet JSON to restrict which repos can deploy to that subnet.
 - Omit or leave `allowed_repos` empty to allow all repos.
 
-### Mounting the JSON File for Network Details
+#### Mounting the JSON File for Network Details
 
 Create a ConfigMap with the JSON file:
 
@@ -516,5 +529,9 @@ EOF
 We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
 
 ## License
+
+## Contact & Support
+
+For questions, issues, or support, please open an issue in the [GitHub repository](https://github.com/mgeorge67701/provider-nutanix/issues) or contact the maintainer via the repository Discussions page. We welcome feedback and contributions from the community!
 
 This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
