@@ -53,20 +53,20 @@ type ProviderConfigSpec struct {
 	// +optional
 	PrismCentralEndpoints map[string]string `json:"prismCentralEndpoints,omitempty"`
 
-	   // DatacenterCredentials maps datacenter names to their specific credentials.
-	   // This allows using different credentials for different Prism Central instances.
-	   // +optional
-	   DatacenterCredentials map[string]ProviderCredentials `json:"datacenterCredentials,omitempty"`
+	// DatacenterCredentials maps datacenter names to their specific credentials.
+	// This allows using different credentials for different Prism Central instances.
+	// +optional
+	DatacenterCredentials map[string]ProviderCredentials `json:"datacenterCredentials,omitempty"`
 
-	   // EnableAvailabilityZoneMapping controls whether the provider should use the availability zone mapping feature.
-	   // If true, the provider will use the mapping URL to map availabilityZone to clusterName. If false or omitted, the feature is disabled.
-	   // +optional
-	   EnableAvailabilityZoneMapping bool `json:"enableAvailabilityZoneMapping,omitempty"`
+	// EnableAvailabilityZoneMapping controls whether the provider should use the availability zone mapping feature.
+	// If true, the provider will use the mapping URL to map availabilityZone to clusterName. If false or omitted, the feature is disabled.
+	// +optional
+	EnableAvailabilityZoneMapping bool `json:"enableAvailabilityZoneMapping,omitempty"`
 
-	   // AvailabilityZoneMappingURL is the URL to fetch the availability zone to cluster mapping CSV.
-	   // If specified and the feature is enabled, this will be used to map availabilityZone to clusterName in VM specs.
-	   // +optional
-	   AvailabilityZoneMappingURL string `json:"availabilityZoneMappingURL,omitempty"`
+	// AvailabilityZoneMappingURL is the URL to fetch the availability zone to cluster mapping CSV.
+	// If specified and the feature is enabled, this will be used to map availabilityZone to clusterName in VM specs.
+	// +optional
+	AvailabilityZoneMappingURL string `json:"availabilityZoneMappingURL,omitempty"`
 }
 
 // ProviderCredentials required to authenticate.

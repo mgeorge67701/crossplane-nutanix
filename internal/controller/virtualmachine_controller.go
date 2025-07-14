@@ -34,56 +34,57 @@ func fetchAvailabilityZoneMapping(url string) (map[string]string, map[string]boo
 		}
 	}()
 
-	   reader := csv.NewReader(resp.Body)
-	   mapping := make(map[string]string)
-	   enabledMap := make(map[string]bool)
-	   // Read header
-	   header, err := reader.Read()
-	   if err != nil {
-			   return nil, nil, err
-	   }
-	   // Find column indexes
-	   var (
-			   idxCluster, idxZone, idxEnabled int
-			   foundCluster, foundZone, foundEnabled bool
-	   )
-	   for i, col := range header {
-			   switch col {
-			   case "Cluster Name":
-					   idxCluster, foundCluster = i, true
-			   case "AvailabilityZone":
-					   idxZone, foundZone = i, true
-			   case "Enabled":
-					   idxEnabled, foundEnabled = i, true
-			   }
-	   }
-	   if !foundCluster || !foundZone || !foundEnabled {
-			   return nil, nil, fmt.Errorf("CSV must have 'Cluster Name', 'AvailabilityZone', and 'Enabled' columns")
-	   }
-	   for {
-			   record, err := reader.Read()
-			   if err == io.EOF {
-					   break
-			   }
-			   if err != nil {
-					   return nil, nil, err
-			   }
-			   if len(record) <= idxEnabled {
-					   continue
-			   }
-			   clusterName := record[idxCluster]
-			   availabilityZone := record[idxZone]
-			   enabled := record[idxEnabled]
-			   if clusterName == "" || availabilityZone == "" {
-					   continue
-			   }
-			   enabledMap[availabilityZone] = (enabled == "enabled")
-			   if enabled == "enabled" {
-					   mapping[availabilityZone] = clusterName
-			   }
-	   }
-	   return mapping, enabledMap, nil
+	reader := csv.NewReader(resp.Body)
+	mapping := make(map[string]string)
+	enabledMap := make(map[string]bool)
+	// Read header
+	header, err := reader.Read()
+	if err != nil {
+		return nil, nil, err
+	}
+	// Find column indexes
+	var (
+		idxCluster, idxZone, idxEnabled       int
+		foundCluster, foundZone, foundEnabled bool
+	)
+	for i, col := range header {
+		switch col {
+		case "Cluster Name":
+			idxCluster, foundCluster = i, true
+		case "AvailabilityZone":
+			idxZone, foundZone = i, true
+		case "Enabled":
+			idxEnabled, foundEnabled = i, true
+		}
+	}
+	if !foundCluster || !foundZone || !foundEnabled {
+		return nil, nil, fmt.Errorf("CSV must have 'Cluster Name', 'AvailabilityZone', and 'Enabled' columns")
+	}
+	for {
+		record, err := reader.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, nil, err
+		}
+		if len(record) <= idxEnabled {
+			continue
+		}
+		clusterName := record[idxCluster]
+		availabilityZone := record[idxZone]
+		enabled := record[idxEnabled]
+		if clusterName == "" || availabilityZone == "" {
+			continue
+		}
+		enabledMap[availabilityZone] = (enabled == "enabled")
+		if enabled == "enabled" {
+			mapping[availabilityZone] = clusterName
+		}
+	}
+	return mapping, enabledMap, nil
 }
+
 // ...existing code...
 
 type VirtualMachineReconciler struct {
@@ -130,49 +131,48 @@ func getValue(details map[string]interface{}, key string) (string, error) {
 	return "", fmt.Errorf("key '%s' not found in details", key)
 }
 
-
 func (r *VirtualMachineReconciler) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
-	   r.log.Debug("Reconciling Nutanix VirtualMachine", "name", req.NamespacedName)
+	r.log.Debug("Reconciling Nutanix VirtualMachine", "name", req.NamespacedName)
 
-	   var vm v1alpha1.VirtualMachine
-	   if err := r.Get(ctx, req.NamespacedName, &vm); err != nil {
-			   return reconcile.Result{}, client.IgnoreNotFound(err)
-	   }
+	var vm v1alpha1.VirtualMachine
+	if err := r.Get(ctx, req.NamespacedName, &vm); err != nil {
+		return reconcile.Result{}, client.IgnoreNotFound(err)
+	}
 
-	   // Load ProviderConfig
-	   var pc v1beta1.ProviderConfig
-	   // Assuming the provider config is named "default", adjust if necessary
-	   if err := r.Get(ctx, client.ObjectKey{Name: "default"}, &pc); err != nil {
-			   return reconcile.Result{}, err
-	   }
+	// Load ProviderConfig
+	var pc v1beta1.ProviderConfig
+	// Assuming the provider config is named "default", adjust if necessary
+	if err := r.Get(ctx, client.ObjectKey{Name: "default"}, &pc); err != nil {
+		return reconcile.Result{}, err
+	}
 
-	   // If availabilityZone is specified and mapping is enabled, fetch mapping from ProviderConfig's URL and map it to clusterName
-	   if vm.Spec.AvailabilityZone != "" && pc.Spec.EnableAvailabilityZoneMapping {
-			   mappingURL := pc.Spec.AvailabilityZoneMappingURL
-			   if mappingURL == "" {
-					   return reconcile.Result{}, fmt.Errorf("availabilityZone specified but ProviderConfig does not have availabilityZoneMappingURL set")
-			   }
-			   mapping, enabledMap, err := fetchAvailabilityZoneMapping(mappingURL)
-			   if err != nil {
-					   return reconcile.Result{}, fmt.Errorf("failed to fetch availability zone mapping: %v", err)
-			   }
-			   enabled, found := enabledMap[vm.Spec.AvailabilityZone]
-			   if !found {
-					   allowed := make([]string, 0, len(enabledMap))
-					   for k := range enabledMap {
-							   allowed = append(allowed, k)
-					   }
-					   return reconcile.Result{}, fmt.Errorf("availabilityZone '%s' is not recognized. Allowed values: %v", vm.Spec.AvailabilityZone, allowed)
-			   }
-			   if !enabled {
-					   return reconcile.Result{}, fmt.Errorf("availabilityZone '%s' is currently disabled and cannot be used for VM deployment", vm.Spec.AvailabilityZone)
-			   }
-			   cluster, ok := mapping[vm.Spec.AvailabilityZone]
-			   if !ok {
-					   return reconcile.Result{}, fmt.Errorf("internal error: enabled availabilityZone '%s' not mapped to a cluster", vm.Spec.AvailabilityZone)
-			   }
-			   vm.Spec.ClusterName = cluster
-	   }
+	// If availabilityZone is specified and mapping is enabled, fetch mapping from ProviderConfig's URL and map it to clusterName
+	if vm.Spec.AvailabilityZone != "" && pc.Spec.EnableAvailabilityZoneMapping {
+		mappingURL := pc.Spec.AvailabilityZoneMappingURL
+		if mappingURL == "" {
+			return reconcile.Result{}, fmt.Errorf("availabilityZone specified but ProviderConfig does not have availabilityZoneMappingURL set")
+		}
+		mapping, enabledMap, err := fetchAvailabilityZoneMapping(mappingURL)
+		if err != nil {
+			return reconcile.Result{}, fmt.Errorf("failed to fetch availability zone mapping: %v", err)
+		}
+		enabled, found := enabledMap[vm.Spec.AvailabilityZone]
+		if !found {
+			allowed := make([]string, 0, len(enabledMap))
+			for k := range enabledMap {
+				allowed = append(allowed, k)
+			}
+			return reconcile.Result{}, fmt.Errorf("availabilityZone '%s' is not recognized. Allowed values: %v", vm.Spec.AvailabilityZone, allowed)
+		}
+		if !enabled {
+			return reconcile.Result{}, fmt.Errorf("availabilityZone '%s' is currently disabled and cannot be used for VM deployment", vm.Spec.AvailabilityZone)
+		}
+		cluster, ok := mapping[vm.Spec.AvailabilityZone]
+		if !ok {
+			return reconcile.Result{}, fmt.Errorf("internal error: enabled availabilityZone '%s' not mapped to a cluster", vm.Spec.AvailabilityZone)
+		}
+		vm.Spec.ClusterName = cluster
+	}
 
 	// LoB validation logic
 	if pc.Spec.IsLoBMandatory && vm.Spec.LoB == "" {
@@ -191,31 +191,30 @@ func (r *VirtualMachineReconciler) Reconcile(ctx context.Context, req reconcile.
 		}
 	}
 
-
-	   // Enforce datacenter validation: only allow datacenters listed in ProviderConfig.PrismCentralEndpoints
-	   var currentCreds v1beta1.ProviderCredentials
-	   if vm.Spec.Datacenter != "" {
-			   if len(pc.Spec.PrismCentralEndpoints) == 0 {
-					   return reconcile.Result{}, fmt.Errorf("datacenter specified in VM spec, but no PrismCentralEndpoints configured in ProviderConfig")
-			   }
-			   if _, ok := pc.Spec.PrismCentralEndpoints[vm.Spec.Datacenter]; !ok {
-					   // Build allowed datacenter list for error message
-					   allowed := make([]string, 0, len(pc.Spec.PrismCentralEndpoints))
-					   for k := range pc.Spec.PrismCentralEndpoints {
-							   allowed = append(allowed, k)
-					   }
-					   return reconcile.Result{}, fmt.Errorf("datacenter '%s' is not allowed. Allowed values: %v", vm.Spec.Datacenter, allowed)
-			   }
-			   // Only allow datacenters that are present in PrismCentralEndpoints
-			   if dcCreds, ok := pc.Spec.DatacenterCredentials[vm.Spec.Datacenter]; ok {
-					   currentCreds = dcCreds
-			   } else {
-					   currentCreds = pc.Spec.Credentials
-			   }
-	   } else {
-			   // Use default credentials if no datacenter is specified
-			   currentCreds = pc.Spec.Credentials
-	   }
+	// Enforce datacenter validation: only allow datacenters listed in ProviderConfig.PrismCentralEndpoints
+	var currentCreds v1beta1.ProviderCredentials
+	if vm.Spec.Datacenter != "" {
+		if len(pc.Spec.PrismCentralEndpoints) == 0 {
+			return reconcile.Result{}, fmt.Errorf("datacenter specified in VM spec, but no PrismCentralEndpoints configured in ProviderConfig")
+		}
+		if _, ok := pc.Spec.PrismCentralEndpoints[vm.Spec.Datacenter]; !ok {
+			// Build allowed datacenter list for error message
+			allowed := make([]string, 0, len(pc.Spec.PrismCentralEndpoints))
+			for k := range pc.Spec.PrismCentralEndpoints {
+				allowed = append(allowed, k)
+			}
+			return reconcile.Result{}, fmt.Errorf("datacenter '%s' is not allowed. Allowed values: %v", vm.Spec.Datacenter, allowed)
+		}
+		// Only allow datacenters that are present in PrismCentralEndpoints
+		if dcCreds, ok := pc.Spec.DatacenterCredentials[vm.Spec.Datacenter]; ok {
+			currentCreds = dcCreds
+		} else {
+			currentCreds = pc.Spec.Credentials
+		}
+	} else {
+		// Use default credentials if no datacenter is specified
+		currentCreds = pc.Spec.Credentials
+	}
 
 	if currentCreds.Source != "Secret" {
 		return reconcile.Result{}, fmt.Errorf("only Secret credentials source is supported")
