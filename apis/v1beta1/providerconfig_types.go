@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -53,10 +53,20 @@ type ProviderConfigSpec struct {
 	// +optional
 	PrismCentralEndpoints map[string]string `json:"prismCentralEndpoints,omitempty"`
 
-	// DatacenterCredentials maps datacenter names to their specific credentials.
-	// This allows using different credentials for different Prism Central instances.
-	// +optional
-	DatacenterCredentials map[string]ProviderCredentials `json:"datacenterCredentials,omitempty"`
+	   // DatacenterCredentials maps datacenter names to their specific credentials.
+	   // This allows using different credentials for different Prism Central instances.
+	   // +optional
+	   DatacenterCredentials map[string]ProviderCredentials `json:"datacenterCredentials,omitempty"`
+
+	   // EnableAvailabilityZoneMapping controls whether the provider should use the availability zone mapping feature.
+	   // If true, the provider will use the mapping URL to map availabilityZone to clusterName. If false or omitted, the feature is disabled.
+	   // +optional
+	   EnableAvailabilityZoneMapping bool `json:"enableAvailabilityZoneMapping,omitempty"`
+
+	   // AvailabilityZoneMappingURL is the URL to fetch the availability zone to cluster mapping CSV.
+	   // If specified and the feature is enabled, this will be used to map availabilityZone to clusterName in VM specs.
+	   // +optional
+	   AvailabilityZoneMappingURL string `json:"availabilityZoneMappingURL,omitempty"`
 }
 
 // ProviderCredentials required to authenticate.

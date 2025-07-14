@@ -10,19 +10,20 @@ import (
 
 // VirtualMachineSpec defines the desired state of a Nutanix VM.
 type VirtualMachineSpec struct {
-	Name            string            `json:"name"`
-	LoB             string            `json:"lob,omitempty"`
-	Datacenter      string            `json:"datacenter,omitempty"`
-	NumVCPUs        int               `json:"numVcpus"`
-	MemorySizeMiB   int               `json:"memorySizeMib"`
-	ClusterUUID     string            `json:"clusterUuid,omitempty"`
-	ClusterName     string            `json:"clusterName,omitempty"`
-	SubnetUUID      string            `json:"subnetUuid,omitempty"`
-	SubnetName      string            `json:"subnetName,omitempty"`
-	ImageUUID       string            `json:"imageUuid,omitempty"`
-	ImageName       string            `json:"imageName,omitempty"`
-	AdditionalDisks []DiskSpec        `json:"additionalDisks,omitempty"`
-	ExternalFacts   map[string]string `json:"externalFacts,omitempty"`
+	   Name            string            `json:"name"`
+	   LoB             string            `json:"lob,omitempty"`
+	   Datacenter      string            `json:"datacenter,omitempty"`
+	   AvailabilityZone string           `json:"availabilityZone,omitempty"`
+	   NumVCPUs        int               `json:"numVcpus"`
+	   MemorySizeMiB   int               `json:"memorySizeMib"`
+	   ClusterUUID     string            `json:"clusterUuid,omitempty"`
+	   ClusterName     string            `json:"clusterName,omitempty"`
+	   SubnetUUID      string            `json:"subnetUuid,omitempty"`
+	   SubnetName      string            `json:"subnetName,omitempty"`
+	   ImageUUID       string            `json:"imageUuid,omitempty"`
+	   ImageName       string            `json:"imageName,omitempty"`
+	   AdditionalDisks []DiskSpec        `json:"additionalDisks,omitempty"`
+	   ExternalFacts   map[string]string `json:"externalFacts,omitempty"`
 }
 
 // DiskSpec defines the disk configuration for a Nutanix VM.

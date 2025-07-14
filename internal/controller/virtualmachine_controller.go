@@ -1,21 +1,85 @@
 package controller
 
 import (
-	"context"
-	"encoding/json"
-	"fmt"
-	"os"
+	   "context"
+	   "encoding/csv"
+	   "encoding/json"
+	   "fmt"
+	   "io"
+	   "net/http"
+	   "os"
 
-	"github.com/crossplane/crossplane-runtime/pkg/logging"
-	"github.com/mgeorge67701/provider-nutanix/apis/v1alpha1"
-	"github.com/mgeorge67701/provider-nutanix/apis/v1beta1"
-	"github.com/mgeorge67701/provider-nutanix/internal/nutanix"
-	corev1 "k8s.io/api/core/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	   "github.com/crossplane/crossplane-runtime/pkg/logging"
+	   "github.com/mgeorge67701/provider-nutanix/apis/v1alpha1"
+	   "github.com/mgeorge67701/provider-nutanix/apis/v1beta1"
+	   "github.com/mgeorge67701/provider-nutanix/internal/nutanix"
+	   corev1 "k8s.io/api/core/v1"
+	   "sigs.k8s.io/controller-runtime/pkg/client"
+	   "sigs.k8s.io/controller-runtime/pkg/controller"
+	   "sigs.k8s.io/controller-runtime/pkg/manager"
+	   "sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
+
+// Fetches the mapping from a CSV URL and returns a map[AvailabilityZone]ClusterName for only enabled zones
+// Also returns a set of all zones and a map of zone->enabled for error reporting
+func fetchAvailabilityZoneMapping(url string) (map[string]string, map[string]bool, error) {
+	   resp, err := http.Get(url)
+	   if err != nil {
+			   return nil, nil, err
+	   }
+	   defer resp.Body.Close()
+
+	   reader := csv.NewReader(resp.Body)
+	   mapping := make(map[string]string)
+	   enabledMap := make(map[string]bool)
+	   // Read header
+	   header, err := reader.Read()
+	   if err != nil {
+			   return nil, nil, err
+	   }
+	   // Find column indexes
+	   var (
+			   idxCluster, idxZone, idxEnabled int
+			   foundCluster, foundZone, foundEnabled bool
+	   )
+	   for i, col := range header {
+			   switch col {
+			   case "Cluster Name":
+					   idxCluster, foundCluster = i, true
+			   case "AvailabilityZone":
+					   idxZone, foundZone = i, true
+			   case "Enabled":
+					   idxEnabled, foundEnabled = i, true
+			   }
+	   }
+	   if !foundCluster || !foundZone || !foundEnabled {
+			   return nil, nil, fmt.Errorf("CSV must have 'Cluster Name', 'AvailabilityZone', and 'Enabled' columns")
+	   }
+	   for {
+			   record, err := reader.Read()
+			   if err == io.EOF {
+					   break
+			   }
+			   if err != nil {
+					   return nil, nil, err
+			   }
+			   if len(record) <= idxEnabled {
+					   continue
+			   }
+			   clusterName := record[idxCluster]
+			   availabilityZone := record[idxZone]
+			   enabled := record[idxEnabled]
+			   if clusterName == "" || availabilityZone == "" {
+					   continue
+			   }
+			   enabledMap[availabilityZone] = (enabled == "enabled")
+			   if enabled == "enabled" {
+					   mapping[availabilityZone] = clusterName
+			   }
+	   }
+	   return mapping, enabledMap, nil
+}
+// ...existing code...
 
 type VirtualMachineReconciler struct {
 	client.Client
@@ -61,20 +125,49 @@ func getValue(details map[string]interface{}, key string) (string, error) {
 	return "", fmt.Errorf("key '%s' not found in details", key)
 }
 
+
 func (r *VirtualMachineReconciler) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
-	r.log.Debug("Reconciling Nutanix VirtualMachine", "name", req.NamespacedName)
+	   r.log.Debug("Reconciling Nutanix VirtualMachine", "name", req.NamespacedName)
 
-	var vm v1alpha1.VirtualMachine
-	if err := r.Get(ctx, req.NamespacedName, &vm); err != nil {
-		return reconcile.Result{}, client.IgnoreNotFound(err)
-	}
+	   var vm v1alpha1.VirtualMachine
+	   if err := r.Get(ctx, req.NamespacedName, &vm); err != nil {
+			   return reconcile.Result{}, client.IgnoreNotFound(err)
+	   }
 
-	// Load ProviderConfig
-	var pc v1beta1.ProviderConfig
-	// Assuming the provider config is named "default", adjust if necessary
-	if err := r.Get(ctx, client.ObjectKey{Name: "default"}, &pc); err != nil {
-		return reconcile.Result{}, err
-	}
+	   // Load ProviderConfig
+	   var pc v1beta1.ProviderConfig
+	   // Assuming the provider config is named "default", adjust if necessary
+	   if err := r.Get(ctx, client.ObjectKey{Name: "default"}, &pc); err != nil {
+			   return reconcile.Result{}, err
+	   }
+
+	   // If availabilityZone is specified and mapping is enabled, fetch mapping from ProviderConfig's URL and map it to clusterName
+	   if vm.Spec.AvailabilityZone != "" && pc.Spec.EnableAvailabilityZoneMapping {
+			   mappingURL := pc.Spec.AvailabilityZoneMappingURL
+			   if mappingURL == "" {
+					   return reconcile.Result{}, fmt.Errorf("availabilityZone specified but ProviderConfig does not have availabilityZoneMappingURL set")
+			   }
+			   mapping, enabledMap, err := fetchAvailabilityZoneMapping(mappingURL)
+			   if err != nil {
+					   return reconcile.Result{}, fmt.Errorf("failed to fetch availability zone mapping: %v", err)
+			   }
+			   enabled, found := enabledMap[vm.Spec.AvailabilityZone]
+			   if !found {
+					   allowed := make([]string, 0, len(enabledMap))
+					   for k := range enabledMap {
+							   allowed = append(allowed, k)
+					   }
+					   return reconcile.Result{}, fmt.Errorf("availabilityZone '%s' is not recognized. Allowed values: %v", vm.Spec.AvailabilityZone, allowed)
+			   }
+			   if !enabled {
+					   return reconcile.Result{}, fmt.Errorf("availabilityZone '%s' is currently disabled and cannot be used for VM deployment", vm.Spec.AvailabilityZone)
+			   }
+			   cluster, ok := mapping[vm.Spec.AvailabilityZone]
+			   if !ok {
+					   return reconcile.Result{}, fmt.Errorf("internal error: enabled availabilityZone '%s' not mapped to a cluster", vm.Spec.AvailabilityZone)
+			   }
+			   vm.Spec.ClusterName = cluster
+	   }
 
 	// LoB validation logic
 	if pc.Spec.IsLoBMandatory && vm.Spec.LoB == "" {

@@ -48,7 +48,7 @@ kubeclt create secret generic nutanix-creds-alpha -n crossplane-system \
   --from-literal=credentials='{"endpoint":"https://pc-alpha.example.com:9440","username":"admin-alpha","password":"your-password-alpha","insecure":true}'
 ```
 
-Create a ProviderConfig that combines all features, including LoB validation, dynamic endpoint selection, and datacenter-specific credentials. A comprehensive example is available in [`examples/providerconfig-all-features.yaml`](./examples/providerconfig-all-features.yaml).
+Create a ProviderConfig that combines all features, including LoB validation, dynamic endpoint selection, datacenter-specific credentials, and availability zone mapping. Here is a comprehensive example:
 
 ```yaml
 apiVersion: nutanix.crossplane.io/v1beta1
@@ -62,7 +62,42 @@ spec:
       namespace: crossplane-system
       name: nutanix-creds-default
       key: credentials
-  # ... (rest of the configuration as in examples/providerconfig-all-features.yaml)
+  prismCentralEndpoints:
+    dc-alpha:
+      endpoint: https://pc-alpha.example.com:9440
+      credentialsSecretRef:
+        namespace: crossplane-system
+        name: nutanix-creds-alpha
+        key: credentials
+    dc-beta:
+      endpoint: https://pc-beta.example.com:9440
+      credentialsSecretRef:
+        namespace: crossplane-system
+        name: nutanix-creds-beta
+        key: credentials
+  defaultDatacenter: dc-alpha
+  allowedLoBs:
+    - CLOUD
+    - SECURITY
+    - FINANCE
+  isLoBMandatory: true
+  datacenterCredentials:
+    dc-alpha:
+      source: Secret
+      secretRef:
+        namespace: crossplane-system
+        name: nutanix-creds-alpha
+        key: credentials
+    dc-beta:
+      source: Secret
+      secretRef:
+        namespace: crossplane-system
+        name: nutanix-creds-beta
+        key: credentials
+  # Optional: Enable dynamic availability zone mapping (set to true to use the mapping feature)
+  enableAvailabilityZoneMapping: true
+  # Optional: URL to a CSV file mapping availabilityZone to clusterName
+  availabilityZoneMappingURL: https://example.com/az-to-cluster.csv
 ```
 
 ## Usage Examples
@@ -84,7 +119,9 @@ spec:
   name: my-crossplane-vm             # Name of the VM in Nutanix
   numVcpus: 4                        # Number of vCPUs
   memorySizeMib: 8192                # Memory in MiB (8 GB)
-  clusterName: aza-ntnx-01           # Cluster name (partial or full, provider resolves UUID)
+  # You can specify either availabilityZone or clusterName. If availabilityZone is set, it will be mapped to the correct cluster name automatically.
+  availabilityZone: aza-ntnx-01 # (Optional) Will be mapped to clusterName automatically
+  # clusterName: ch-08-vn-nutanix01  # (Optional) You can specify this directly instead
   subnetName: prod-subnet            # Subnet name (partial or full)
   imageName: ubuntu-22.04-cloud      # Image name (partial or full, provider picks latest match)
   lob: CLOUD                         # Line of Business (must match allowed values if validation enabled)
@@ -99,9 +136,12 @@ spec:
     owner: alice@example.com
 ```
 
+
 **How it works:**
+
 - `providerConfigRef.name`: Reference to your ProviderConfig (with credentials and endpoint info).
 - `datacenter`: (Optional) If using multi-datacenter, selects which Prism Central to use.
+- `availabilityZone`: (Optional) If set and `enableAvailabilityZoneMapping` is true, will be mapped to the correct cluster name automatically using the mapping CSV. If both `availabilityZone` and `clusterName` are set, `availabilityZone` takes precedence.
 - `clusterName`, `subnetName`, `imageName`: Use human-friendly names or partial names; the provider resolves UUIDs automatically.
 - `lob`: Specify a valid Line of Business if required by your ProviderConfig.
 - `additionalDisks` and `externalFacts`: Optional, for advanced VM customization.
@@ -110,7 +150,16 @@ spec:
 
 ---
 
+> **Note:**
+> - The dynamic availability zone mapping feature is opt-in. Set `enableAvailabilityZoneMapping: true` and provide a valid `availabilityZoneMappingURL` to use it. If not set, the provider defaults to normal behavior and expects `clusterName` to be specified directly.
+> - This makes the provider general-purpose and not tied to any specific company or environment.
+
+---
+
 ## ProviderConfig Example (Multi-Datacenter)
+
+> 
+> `datacenter 'dc-gamma' is not allowed. Allowed values: [dc-alpha dc-beta]`
 
 ```yaml
 apiVersion: nutanix.crossplane.io/v1beta1
@@ -118,6 +167,12 @@ kind: ProviderConfig
 metadata:
   name: all-features-config
 spec:
+  credentials:
+    source: Secret
+    secretRef:
+      namespace: crossplane-system
+      name: nutanix-creds-default
+      key: credentials
   prismCentralEndpoints:
     dc-alpha:
       endpoint: https://pc-alpha.example.com:9440
@@ -137,19 +192,25 @@ spec:
     - SECURITY
     - FINANCE
   isLoBMandatory: true
-
-> **Note:** Only datacenters listed under `prismCentralEndpoints` are allowed. If you specify a `datacenter` in your VM spec that is not listed here, the provider will return an error like:
-> 
-> `datacenter 'dc-gamma' is not allowed. Allowed values: [dc-alpha dc-beta]`
+  # Optional: URL to a CSV file mapping availabilityZone to clusterName
+  availabilityZoneMappingURL: https://example.com/az-to-cluster.csv
 ```
+
+> **Note:**
+> - Only datacenters listed under `prismCentralEndpoints` are allowed. If you specify a `datacenter` in your VM spec that is not listed here, the provider will return an error like:
+>   `datacenter 'dc-gamma' is not allowed. Allowed values: [dc-alpha dc-beta]`
+> - If you set `availabilityZone` in your VM spec, the provider will fetch the mapping from the URL specified in `availabilityZoneMappingURL` and automatically set the correct `clusterName`. If both `availabilityZone` and `clusterName` are set, `availabilityZone` takes precedence.
 
 ---
 
-## FAQ
 
+## FAQ
 
 **Q: How does the provider know which Prism Central to use?**
 A: By the `datacenter` field in your VM spec, which must match one of the keys in your ProviderConfig's `prismCentralEndpoints`. If you specify a datacenter not listed, the provider will return an error and the VM will not be created.
+
+**Q: How does availabilityZone mapping work?**
+A: If you set `availabilityZone` in your VM spec, the provider will fetch a mapping table from the URL specified in `availabilityZoneMappingURL` in your ProviderConfig. It will then set the correct `clusterName` for you. If both `availabilityZone` and `clusterName` are set, `availabilityZone` takes precedence.
 
 **Q: Do I need to specify UUIDs?**
 A: No, just use names or partial names; the provider will resolve UUIDs automatically.
