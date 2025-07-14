@@ -377,6 +377,33 @@ kubectl create configmap network-details -n crossplane-system \
   --from-file=network-details.json=/path/to/network-details.json
 ```
 
+Or, create the ConfigMap using a YAML manifest (recommended for version control):
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: network-details
+  namespace: crossplane-system
+data:
+  network-details.json: |
+    {
+      "domain": "example.com",
+      "nameserver": "192.168.1.1",
+      "gateway": "192.168.1.254",
+      "network": "192.168.1.0/24",
+      "subnet": "example-subnet",
+      "email": "admin@example.com",
+      "puppet_master": "puppet.example.com",
+      "network_management_server": "nms.example.com",
+      "foreman_host": "foreman.example.com",
+      "allowed_repos": [
+        "test1",
+        "test2"
+      ]
+    }
+```
+
 Update the provider deployment to mount the ConfigMap:
 
 ```yaml
