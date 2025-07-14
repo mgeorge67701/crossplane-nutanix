@@ -336,6 +336,35 @@ func (r *VirtualMachineReconciler) Reconcile(ctx context.Context, req reconcile.
 			r.log.Debug("No matching subnet found for partial name", "subnetName", vm.Spec.SubnetName)
 			return reconcile.Result{}, fmt.Errorf("no subnet found matching name: %s", vm.Spec.SubnetName)
 		}
+
+		// Enforce allowed_repos restriction from subnet JSON file
+		// Use label 'repo' on the VM as the repo identifier
+		repoName := ""
+		if val, ok := vm.Labels["repo"]; ok {
+			repoName = val
+		}
+		details, err := readDetailsByName("network", latestSubnet.Name)
+		if err == nil {
+			if allowed, ok := details["allowed_repos"]; ok {
+				if allowedList, ok := allowed.([]interface{}); ok {
+					if len(allowedList) > 0 {
+						repoAllowed := false
+						if repoName != "" {
+							for _, v := range allowedList {
+								if s, ok := v.(string); ok && s == repoName {
+									repoAllowed = true
+									break
+								}
+							}
+						}
+						if !repoAllowed {
+							return reconcile.Result{}, fmt.Errorf("repo '%s' is not allowed to use subnet '%s'", repoName, latestSubnet.Name)
+						}
+					} // else: allowed_repos is empty, allow any repo
+				}
+			}
+		}
+
 		vm.Spec.SubnetUUID = latestSubnet.UUID
 	}
 

@@ -122,7 +122,7 @@ spec:
   # You can specify either availabilityZone or clusterName. If availabilityZone is set, it will be mapped to the correct cluster name automatically.
   availabilityZone: aza-ntnx-01 # (Optional) Will be mapped to clusterName automatically
   # clusterName: ch-08-vn-nutanix01  # (Optional) You can specify this directly instead
-  subnetName: prod-subnet            # Subnet name (partial or full)
+  subnetName: prod-subnet            # Subnet name (must match the network JSON/ConfigMap file name)
   imageName: ubuntu-22.04-cloud      # Image name (partial or full, provider picks latest match)
   lob: CLOUD                         # Line of Business (must match allowed values if validation enabled)
   additionalDisks:                   # (Optional) Attach extra disks
@@ -137,16 +137,20 @@ spec:
 ```
 
 
+
+
 **How it works:**
 
 - `providerConfigRef.name`: Reference to your ProviderConfig (with credentials and endpoint info).
 - `datacenter`: (Optional) If using multi-datacenter, selects which Prism Central to use.
 - `availabilityZone`: (Optional) If set and `enableAvailabilityZoneMapping` is true, will be mapped to the correct cluster name automatically using the mapping CSV. If both `availabilityZone` and `clusterName` are set, `availabilityZone` takes precedence.
-- `clusterName`, `subnetName`, `imageName`: Use human-friendly names or partial names; the provider resolves UUIDs automatically.
+- `clusterName`, `imageName`: Use human-friendly names or partial names; the provider resolves UUIDs automatically.
+- `subnetName`: The name of the subnet to use. This must match the network JSON/ConfigMap file name (e.g., `network-prod-subnet.json` for `subnetName: prod-subnet`). The provider will read the corresponding file for subnet details and access control (such as `allowed_repos`).
+  - **All fields in the JSON file** (e.g., `gateway`, `nameserver`, `domain`, etc.) will be used to configure the VM's network if present, allowing you to fully define network settings per subnet.
 - `lob`: Specify a valid Line of Business if required by your ProviderConfig.
 - `additionalDisks` and `externalFacts`: Optional, for advanced VM customization.
 
-**No JSON file is needed** for this example—just use names and the provider will handle all lookups.
+**No JSON file is needed** for this example unless you want to provide custom network details or access control. If you do, ensure the file is mounted and named to match the `subnetName`.
 
 ---
 
@@ -306,7 +310,8 @@ The provider will automatically read the JSON file from `/etc/provider/dynamic-v
 
 You can store network-related values such as `domain`, `nameserver`, `gateway`, `network`, and others in a JSON file and mount it into the provider pod. The provider will read this file at runtime.
 
-### Example JSON File for Network Details
+
+### Example JSON File for Network Details (with Subnet Access Control)
 
 ```json
 {
@@ -318,9 +323,37 @@ You can store network-related values such as `domain`, `nameserver`, `gateway`, 
     "email": "admin@example.com",
     "puppet_master": "puppet.example.com",
     "network_management_server": "nms.example.com",
-    "foreman_host": "foreman.example.com"
+    "foreman_host": "foreman.example.com",
+    "allowed_repos": [
+        "test1",
+        "test2"
+    ]
 }
 ```
+
+#### Subnet Access Control with `allowed_repos`
+
+- If the `allowed_repos` field is present and contains one or more repo names, **only** VirtualMachine resources with a matching `repo` label (e.g., `repo: test1`) can use this subnet.
+- If `allowed_repos` is missing or is an empty list, **any repo** (or a VM with no `repo` label) can use the subnet.
+- If a VM tries to use a subnet with a non-matching `repo` label, the operation will be denied with an error.
+
+**Example VirtualMachine with repo label:**
+
+```yaml
+apiVersion: nutanix.crossplane.io/v1alpha1
+kind: VirtualMachine
+metadata:
+  name: example-vm
+  labels:
+    repo: test1   # This must match an entry in allowed_repos for the subnet
+spec:
+  subnetName: example-subnet
+  # ...other fields...
+```
+
+**Summary:**
+- Use `allowed_repos` in your subnet JSON to restrict which repos can deploy to that subnet.
+- Omit or leave `allowed_repos` empty to allow all repos.
 
 ### Mounting the JSON File for Network Details
 
