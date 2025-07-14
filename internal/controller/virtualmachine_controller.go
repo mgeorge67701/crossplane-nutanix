@@ -1,23 +1,23 @@
 package controller
 
 import (
-	   "context"
-	   "encoding/csv"
-	   "encoding/json"
-	   "fmt"
-	   "io"
-	   "net/http"
-	   "os"
+	"context"
+	"encoding/csv"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
 
-	   "github.com/crossplane/crossplane-runtime/pkg/logging"
-	   "github.com/mgeorge67701/provider-nutanix/apis/v1alpha1"
-	   "github.com/mgeorge67701/provider-nutanix/apis/v1beta1"
-	   "github.com/mgeorge67701/provider-nutanix/internal/nutanix"
-	   corev1 "k8s.io/api/core/v1"
-	   "sigs.k8s.io/controller-runtime/pkg/client"
-	   "sigs.k8s.io/controller-runtime/pkg/controller"
-	   "sigs.k8s.io/controller-runtime/pkg/manager"
-	   "sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"github.com/crossplane/crossplane-runtime/pkg/logging"
+	"github.com/mgeorge67701/provider-nutanix/apis/v1alpha1"
+	"github.com/mgeorge67701/provider-nutanix/apis/v1beta1"
+	"github.com/mgeorge67701/provider-nutanix/internal/nutanix"
+	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 // Fetches the mapping from a CSV URL and returns a map[AvailabilityZone]ClusterName for only enabled zones
