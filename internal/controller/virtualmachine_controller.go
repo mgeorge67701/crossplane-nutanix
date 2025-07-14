@@ -23,11 +23,16 @@ import (
 // Fetches the mapping from a CSV URL and returns a map[AvailabilityZone]ClusterName for only enabled zones
 // Also returns a set of all zones and a map of zone->enabled for error reporting
 func fetchAvailabilityZoneMapping(url string) (map[string]string, map[string]bool, error) {
-	   resp, err := http.Get(url)
-	   if err != nil {
-			   return nil, nil, err
-	   }
-	   defer resp.Body.Close()
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer func() {
+		cerr := resp.Body.Close()
+		if cerr != nil {
+			fmt.Printf("warning: error closing response body: %v\n", cerr)
+		}
+	}()
 
 	   reader := csv.NewReader(resp.Body)
 	   mapping := make(map[string]string)

@@ -43,6 +43,8 @@ jobs:
         go mod download
       env:
         GOPROXY: https://proxy.golang.org,direct
+    - name: Run golangci-lint (auto-fix)
+      run: golangci-lint run --fix --timeout=10m
     - name: Run tests
       run: go test -v ./...
       env:
