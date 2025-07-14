@@ -98,8 +98,8 @@ func (c *Client) ListClusters() ([]struct {
 		Name string
 		UUID string
 	}{
-		{Name: "ch01-aza-ntnx-01", UUID: "00000000-0000-0000-0000-000000000000"},
-		{Name: "ch02-aza-ntnx-02", UUID: "11111111-1111-1111-1111-111111111111"},
+		{Name: "aza-ntnx-01", UUID: "00000000-0000-0000-0000-000000000000"},
+		{Name: "aza-ntnx-02", UUID: "11111111-1111-1111-1111-111111111111"},
 	}, nil
 }
 
