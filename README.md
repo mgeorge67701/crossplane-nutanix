@@ -67,7 +67,10 @@ spec:
 
 ## Usage Examples
 
-### Create a Virtual Machine
+
+## Complete VirtualMachine Example
+
+Below is a full example of a VirtualMachine resource using all common fields, including dynamic datacenter selection, LoB, additional disks, and external facts. You do **not** need to provide UUIDs or JSON files for normal use—just use names or partial names, and the provider will resolve everything automatically.
 
 ```yaml
 apiVersion: nutanix.crossplane.io/v1alpha1
@@ -75,110 +78,88 @@ kind: VirtualMachine
 metadata:
   name: example-vm
 spec:
-  name: "my-crossplane-vm"
-  numVcpus: 2
-  memorySizeMib: 4096
-  clusterName: "aza-ntnx-01"  # Specify the cluster name to fetch details dynamically
-  imageName: "ubuntu-22.04-cloud"
-  lob: "CLOUD" # Example: Specify the Line of Business
-```
-
-The provider will automatically resolve the `clusterUuid`, `subnetUuid`, and `imageUuid` from the names you provide in the spec. You can specify either the UUID or a partial name for each resource (cluster, subnet, image). If you specify a partial name (e.g., `clusterName`, `subnetName`, `imageName`), the provider will search Nutanix Prism Central for resources whose names contain the given string and select the latest available match. You do **not** need to mount or manage any JSON files for UUID lookup; all lookups are performed dynamically using the Nutanix API.
-
-### Line of Business (LoB) Validation
-
-The `VirtualMachine` resource includes an optional `lob` field in its `spec`. This field allows you to associate a Line of Business with your virtual machines. The validation rules for this field are configured in the `ProviderConfig`.
-
-Refer to the `allowedLoBs` and `isLoBMandatory` fields in the [`examples/providerconfig-all-features.yaml`](./examples/providerconfig-all-features.yaml) for a comprehensive example of how to configure LoB validation.
-
-### Specifying the Image
-
-You can specify the image by name in your `VirtualMachine` spec. The provider will automatically fetch the corresponding image UUID from Nutanix Prism Central using the API, so you do not need to specify the UUID directly.
-
-```yaml
-spec:
-  clusterName: "aza-ntnx-01"
-  imageName: "ubuntu-22.04-cloud"
-```
-
-The provider will use the `imageName` to look up the image UUID at runtime, just like it does for the cluster name. This makes your manifests more portable and easier to maintain.
-
-> **Note:** The image UUID will be resolved automatically; you only need to provide the image name.
-
-### Specifying the Image (Automatic Latest Selection)
-
-You can specify a partial image name (e.g., `rhel8`, `rhel9`, `win2022`, `win2019`) in your `VirtualMachine` spec. The provider will automatically search for images in Nutanix Prism Central whose names contain the given string and select the latest available image (by creation date or version) for you.
-
-```yaml
-spec:
-  clusterName: "aza-ntnx-01"
-  imageName: "rhel8"   # Will pick the latest RHEL 8 image available
-```
-
-You can use this for any OS family or version:
-- `imageName: "rhel9"` will pick the latest RHEL 9 image
-- `imageName: "win2022"` will pick the latest Windows Server 2022 image
-- `imageName: "win2019"` will pick the latest Windows Server 2019 image
-
-> **Note:** The provider will resolve the latest matching image automatically. You do not need to specify the full image name or UUID.
-
-### Specifying Additional Disks
-
-You can specify additional disks for your Virtual Machine in the `additionalDisks` section of the spec. Each disk can have a `deviceIndex` and `sizeGb` specified.
-
-```yaml
-apiVersion: nutanix.crossplane.io/v1alpha1
-kind: VirtualMachine
-metadata:
-  name: example-vm
-spec:
-  name: "my-crossplane-vm"
-  numVcpus: 2
-  memorySizeMib: 4096
-  clusterName: "aza-ntnx-01"
-  imageName: "ubuntu-22.04-cloud"
-  additionalDisks:
+  providerConfigRef:
+    name: all-features-config         # Reference to your ProviderConfig
+  datacenter: dc-alpha               # (Optional) Selects the Prism Central endpoint/credentials
+  name: my-crossplane-vm             # Name of the VM in Nutanix
+  numVcpus: 4                        # Number of vCPUs
+  memorySizeMib: 8192                # Memory in MiB (8 GB)
+  clusterName: aza-ntnx-01           # Cluster name (partial or full, provider resolves UUID)
+  subnetName: prod-subnet            # Subnet name (partial or full)
+  imageName: ubuntu-22.04-cloud      # Image name (partial or full, provider picks latest match)
+  lob: CLOUD                         # Line of Business (must match allowed values if validation enabled)
+  additionalDisks:                   # (Optional) Attach extra disks
     - deviceIndex: 1
-      sizeGb: 20
+      sizeGb: 50
     - deviceIndex: 2
       sizeGb: 100
-  externalFacts:
-    bt_product: "inf"
-    another_fact: "value"
+  externalFacts:                     # (Optional) Arbitrary key-value pairs for automation/config
+    bt_product: inf
+    environment: production
+    owner: alice@example.com
 ```
 
-In this example, two additional disks are specified: one with `deviceIndex` 1 and size 20 GB, and another with `deviceIndex` 2 and size 100 GB. The `deviceIndex` specifies the order in which the disks are attached to the VM.
+**How it works:**
+- `providerConfigRef.name`: Reference to your ProviderConfig (with credentials and endpoint info).
+- `datacenter`: (Optional) If using multi-datacenter, selects which Prism Central to use.
+- `clusterName`, `subnetName`, `imageName`: Use human-friendly names or partial names; the provider resolves UUIDs automatically.
+- `lob`: Specify a valid Line of Business if required by your ProviderConfig.
+- `additionalDisks` and `externalFacts`: Optional, for advanced VM customization.
 
-In this example, `externalFacts` allows you to pass arbitrary key-value pairs to the VM, similar to Terraform's `external_facts` map. These facts can be used for configuration management or automation tools running inside the VM.
+**No JSON file is needed** for this example—just use names and the provider will handle all lookups.
 
-### Dynamic Prism Central Endpoint Selection
+---
 
-The provider supports dynamic selection of the Prism Central endpoint and associated credentials based on a `datacenter` field specified in the `VirtualMachine` spec. This allows you to manage VMs across multiple Nutanix environments from a single Crossplane provider instance.
-
-Refer to the `prismCentralEndpoints` and `datacenterCredentials` fields in the [`examples/providerconfig-all-features.yaml`](./examples/providerconfig-all-features.yaml) for a comprehensive example of how to configure dynamic endpoint and credential selection.
-
-## Finding UUIDs
-
-You can still look up UUIDs manually in Prism Central if needed:
-
-- **Cluster UUID**: Prism Central → Home → Infrastructure → Clusters
-- **Subnet UUID**: Prism Central → Network & Security → Subnets
-- **Image UUID**: Prism Central → Compute & Storage → Images
-
-## Example: Fetching Cluster, Subnet, and Image UUIDs from Nutanix
-
-You only need to provide the partial name in your `VirtualMachine` spec. The provider will automatically fetch the corresponding UUID from Nutanix Prism Central using the API, so you do not need to specify the UUID in any JSON file.
+## ProviderConfig Example (Multi-Datacenter)
 
 ```yaml
+apiVersion: nutanix.crossplane.io/v1beta1
+kind: ProviderConfig
+metadata:
+  name: all-features-config
 spec:
-  clusterName: "aza-ntnx-01"
-  subnetName: "prod-subnet"
-  imageName: "rhel8"
+  prismCentralEndpoints:
+    dc-alpha:
+      endpoint: https://pc-alpha.example.com:9440
+      credentialsSecretRef:
+        namespace: crossplane-system
+        name: nutanix-creds-alpha
+        key: credentials
+    dc-beta:
+      endpoint: https://pc-beta.example.com:9440
+      credentialsSecretRef:
+        namespace: crossplane-system
+        name: nutanix-creds-beta
+        key: credentials
+  defaultDatacenter: dc-alpha
+  allowedLoBs:
+    - CLOUD
+    - SECURITY
+    - FINANCE
+  isLoBMandatory: true
 ```
 
-The provider will use the partial names to look up the UUIDs at runtime. This is similar to how Terraform data sources work, where you reference a resource by name and the provider resolves the UUID for you.
+---
 
-> **Note:** You do not need to create or mount a JSON file for cluster, subnet, or image UUID lookup. The provider will fetch the UUIDs directly from Nutanix using the names you specify in your resource spec.
+## FAQ
+
+**Q: How does the provider know which Prism Central to use?**
+A: By the `datacenter` field in your VM spec, which maps to endpoints in your ProviderConfig.
+
+**Q: Do I need to specify UUIDs?**
+A: No, just use names or partial names; the provider will resolve UUIDs automatically.
+
+**Q: Do I need to mount a JSON file?**
+A: No, unless you have a special use case for dynamic values or network details.
+
+---
+
+## More Examples
+
+See the [`examples/`](./examples) directory for:
+- [`providerconfig-all-features.yaml`](./examples/providerconfig-all-features.yaml): Full ProviderConfig with LoB validation and multi-datacenter.
+- [`virtualmachine.yaml`](./examples/virtualmachine.yaml): Basic VM.
+- [`virtualmachine-advanced.yaml`](./examples/virtualmachine-advanced.yaml): Advanced VM with disks and facts.
 
 ## Examples
 
