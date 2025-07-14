@@ -93,20 +93,31 @@ func (r *VirtualMachineReconciler) Reconcile(ctx context.Context, req reconcile.
 		}
 	}
 
-	// Determine which credentials to use
-	var currentCreds v1beta1.ProviderCredentials
-	if vm.Spec.Datacenter != "" {
-		if dcCreds, ok := pc.Spec.DatacenterCredentials[vm.Spec.Datacenter]; ok {
-			currentCreds = dcCreds
-		} else {
-			// Fallback to default credentials if datacenter-specific not found
-			currentCreds = pc.Spec.Credentials
-			r.log.Debug("Datacenter-specific credentials not found, falling back to default", "datacenter", vm.Spec.Datacenter)
-		}
-	} else {
-		// Use default credentials if no datacenter is specified
-		currentCreds = pc.Spec.Credentials
-	}
+
+	   // Enforce datacenter validation: only allow datacenters listed in ProviderConfig.PrismCentralEndpoints
+	   var currentCreds v1beta1.ProviderCredentials
+	   if vm.Spec.Datacenter != "" {
+			   if len(pc.Spec.PrismCentralEndpoints) == 0 {
+					   return reconcile.Result{}, fmt.Errorf("datacenter specified in VM spec, but no PrismCentralEndpoints configured in ProviderConfig")
+			   }
+			   if _, ok := pc.Spec.PrismCentralEndpoints[vm.Spec.Datacenter]; !ok {
+					   // Build allowed datacenter list for error message
+					   allowed := make([]string, 0, len(pc.Spec.PrismCentralEndpoints))
+					   for k := range pc.Spec.PrismCentralEndpoints {
+							   allowed = append(allowed, k)
+					   }
+					   return reconcile.Result{}, fmt.Errorf("datacenter '%s' is not allowed. Allowed values: %v", vm.Spec.Datacenter, allowed)
+			   }
+			   // Only allow datacenters that are present in PrismCentralEndpoints
+			   if dcCreds, ok := pc.Spec.DatacenterCredentials[vm.Spec.Datacenter]; ok {
+					   currentCreds = dcCreds
+			   } else {
+					   currentCreds = pc.Spec.Credentials
+			   }
+	   } else {
+			   // Use default credentials if no datacenter is specified
+			   currentCreds = pc.Spec.Credentials
+	   }
 
 	if currentCreds.Source != "Secret" {
 		return reconcile.Result{}, fmt.Errorf("only Secret credentials source is supported")

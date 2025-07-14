@@ -80,7 +80,7 @@ metadata:
 spec:
   providerConfigRef:
     name: all-features-config         # Reference to your ProviderConfig
-  datacenter: dc-alpha               # (Optional) Selects the Prism Central endpoint/credentials
+  datacenter: dc-alpha               # (Optional) Must match a datacenter in ProviderConfig; otherwise, an error is returned
   name: my-crossplane-vm             # Name of the VM in Nutanix
   numVcpus: 4                        # Number of vCPUs
   memorySizeMib: 8192                # Memory in MiB (8 GB)
@@ -137,14 +137,19 @@ spec:
     - SECURITY
     - FINANCE
   isLoBMandatory: true
+
+> **Note:** Only datacenters listed under `prismCentralEndpoints` are allowed. If you specify a `datacenter` in your VM spec that is not listed here, the provider will return an error like:
+> 
+> `datacenter 'dc-gamma' is not allowed. Allowed values: [dc-alpha dc-beta]`
 ```
 
 ---
 
 ## FAQ
 
+
 **Q: How does the provider know which Prism Central to use?**
-A: By the `datacenter` field in your VM spec, which maps to endpoints in your ProviderConfig.
+A: By the `datacenter` field in your VM spec, which must match one of the keys in your ProviderConfig's `prismCentralEndpoints`. If you specify a datacenter not listed, the provider will return an error and the VM will not be created.
 
 **Q: Do I need to specify UUIDs?**
 A: No, just use names or partial names; the provider will resolve UUIDs automatically.
