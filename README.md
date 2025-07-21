@@ -2,7 +2,8 @@
 
 A Crossplane provider for managing Nutanix infrastructure resources through Kubernetes APIs.
 
-[![CI](https://github.com/mgeorge67701/provider-nutanix/actions/workflows/ci.yml/badge.svg)](https://github.com/mgeorge67701/provider-nutanix/actions/workflows/ci.yml)
+
+[![CI](https://github.com/mgeorge67701/crossplane-nutanix/actions/workflows/ci.yml/badge.svg)](https://github.com/mgeorge67701/crossplane-nutanix/actions/workflows/ci.yml)
 [![Upbound Marketplace](https://img.shields.io/badge/Upbound-Marketplace-blue)](https://marketplace.upbound.io/providers/mgeorge67701/provider-nutanix)
 
 ## Table of Contents
@@ -559,6 +560,7 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 
 ## Contact & Support
 
-For questions, issues, or support, please open an issue in the [GitHub repository](https://github.com/mgeorge67701/provider-nutanix/issues) or contact the maintainer via the repository Discussions page. We welcome feedback and contributions from the community!
+
+For questions, issues, or support, please open an issue in the [GitHub repository](https://github.com/mgeorge67701/crossplane-nutanix/issues) or contact the maintainer via the repository Discussions page. We welcome feedback and contributions from the community!
 
 This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
