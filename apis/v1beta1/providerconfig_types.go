@@ -18,12 +18,12 @@ package v1beta1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 )
 
 // ProviderConfig configures a Nutanix provider.
+// +kubebuilder:object:root=true
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 // +kubebuilder:printcolumn:name="SECRET-NAME",type="string",JSONPath=".spec.credentials.secretRef.name",priority=1
 // +kubebuilder:resource:scope=Cluster,categories={crossplane,provider,nutanix}
@@ -85,14 +85,6 @@ type ProviderConfigList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []ProviderConfig `json:"items"`
-}
-
-func (in *ProviderConfig) DeepCopyObject() runtime.Object {
-	return in
-}
-
-func (in *ProviderConfigList) DeepCopyObject() runtime.Object {
-	return in
 }
 
 // GetCondition of this ProviderConfig.
