@@ -7,7 +7,9 @@ GOARCH ?= amd64
 
 # Generate code (required by CI)
 generate:
-	@echo "No code generation needed"
+	@echo "Generating deepcopy methods..."
+	@which controller-gen || go install sigs.k8s.io/controller-tools/cmd/controller-gen@latest
+	@controller-gen object:headerFile="hack/boilerplate.go.txt" paths="./apis/..."
 
 # Build for current platform
 build:

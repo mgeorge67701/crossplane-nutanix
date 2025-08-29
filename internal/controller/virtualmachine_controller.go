@@ -15,9 +15,9 @@ import (
 	"github.com/mgeorge67701/provider-nutanix/internal/nutanix"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 // Fetches the mapping from a CSV URL and returns a map[AvailabilityZone]ClusterName for only enabled zones
@@ -422,11 +422,10 @@ func containsIgnoreCase(s, substr string) bool {
 }
 
 func SetupVirtualMachine(mgr manager.Manager, l logging.Logger) error {
-	_, err := controller.New("virtualmachine-controller", mgr, controller.Options{
-		Reconciler: &VirtualMachineReconciler{
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&v1alpha1.VirtualMachine{}).
+		Complete(&VirtualMachineReconciler{
 			Client: mgr.GetClient(),
 			log:    l,
-		},
-	})
-	return err
+		})
 }

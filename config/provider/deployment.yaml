@@ -16,8 +16,8 @@ spec:
       serviceAccountName: provider-nutanix
       containers:
         - name: provider-nutanix
-          image: crossplane/provider-nutanix:latest
-          imagePullPolicy: IfNotPresent
+          image: ghcr.io/mgeorge67701/provider-nutanix:latest
+          imagePullPolicy: Always
           command:
             - /provider
           env:
