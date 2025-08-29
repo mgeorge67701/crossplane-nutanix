@@ -192,6 +192,9 @@ jobs:
         echo "--- Content of package/nutanix.crossplane.io_providerconfigs.yaml ---"
         cat package/nutanix.crossplane.io_providerconfigs.yaml
         echo "--- End of content ---"
+        echo "--- Hexdump of package/nutanix.crossplane.io_providerconfigs.yaml ---"
+        hexdump -C package/nutanix.crossplane.io_providerconfigs.yaml
+        echo "--- End of hexdump ---"
         # Ensure no examples directory exists to avoid validation conflicts
         rm -rf package/examples
         # Try Upbound CLI first (cleaner output), then fallback to Crossplane CLI
