@@ -14,10 +14,10 @@ import (
 	"github.com/mgeorge67701/provider-nutanix/apis/v1beta1"
 	"github.com/mgeorge67701/provider-nutanix/internal/nutanix"
 	corev1 "k8s.io/api/core/v1"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 // Fetches the mapping from a CSV URL and returns a map[AvailabilityZone]ClusterName for only enabled zones

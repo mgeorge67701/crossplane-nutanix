@@ -31,45 +31,45 @@ import (
 type VirtualMachineSpec struct {
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
-	
+
 	// +kubebuilder:validation:Optional
 	LoB string `json:"lob,omitempty"`
-	
+
 	// +kubebuilder:validation:Optional
 	Datacenter string `json:"datacenter,omitempty"`
-	
+
 	// +kubebuilder:validation:Optional
 	AvailabilityZone string `json:"availabilityZone,omitempty"`
-	
+
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minimum=1
 	NumVCPUs int `json:"numVcpus"`
-	
+
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minimum=512
 	MemorySizeMiB int `json:"memorySizeMib"`
-	
+
 	// +kubebuilder:validation:Optional
 	ClusterUUID string `json:"clusterUuid,omitempty"`
-	
+
 	// +kubebuilder:validation:Optional
 	ClusterName string `json:"clusterName,omitempty"`
-	
+
 	// +kubebuilder:validation:Optional
 	SubnetUUID string `json:"subnetUuid,omitempty"`
-	
+
 	// +kubebuilder:validation:Optional
 	SubnetName string `json:"subnetName,omitempty"`
-	
+
 	// +kubebuilder:validation:Optional
 	ImageUUID string `json:"imageUuid,omitempty"`
-	
+
 	// +kubebuilder:validation:Optional
 	ImageName string `json:"imageName,omitempty"`
-	
+
 	// +kubebuilder:validation:Optional
 	AdditionalDisks []DiskSpec `json:"additionalDisks,omitempty"`
-	
+
 	// +kubebuilder:validation:Optional
 	ExternalFacts map[string]string `json:"externalFacts,omitempty"`
 
@@ -83,14 +83,14 @@ type DiskSpec struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minimum=0
 	DeviceIndex int `json:"deviceIndex"`
-	
+
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minimum=1
 	SizeGb int `json:"sizeGb"`
-	
+
 	// +kubebuilder:validation:Optional
 	ImageUUID string `json:"imageUuid,omitempty"`
-	
+
 	// +kubebuilder:validation:Optional
 	ImageName string `json:"imageName,omitempty"`
 }
@@ -98,10 +98,10 @@ type DiskSpec struct {
 // VirtualMachineStatus defines the observed state of a Nutanix VM.
 type VirtualMachineStatus struct {
 	xpv1.ConditionedStatus `json:",inline"`
-	
+
 	// +kubebuilder:validation:Optional
 	VMID string `json:"vmId,omitempty"`
-	
+
 	// +kubebuilder:validation:Optional
 	State string `json:"state,omitempty"`
 }
