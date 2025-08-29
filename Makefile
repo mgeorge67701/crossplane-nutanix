@@ -15,7 +15,7 @@ generate:
 generate-crds:
 	@echo "Generating CRDs..."
 	@which controller-gen || go install sigs.k8s.io/controller-tools/cmd/controller-gen@latest
-	@controller-gen crd:generateEmbeddedObjectMeta=true paths="./apis/..." output:crd:artifacts:config=config/crd
+	@controller-gen crd paths="./apis/..." output:crd:artifacts:config=config/crd
 
 # Build for current platform
 build:
