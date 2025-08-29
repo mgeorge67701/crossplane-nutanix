@@ -160,6 +160,11 @@ jobs:
       run: |
         echo "Forcibly overwriting CRDs in package/ with freshly generated ones"
         cp -f config/crd/nutanix.crossplane.io_*.yaml package/
+    - name: Fix line endings in CRDs
+      run: |
+        echo "Converting CRLF to LF in CRD files to ensure consistent line endings..."
+        find package/ -name "*.yaml" -exec sed -i 's/\r$//' {} +
+        echo "Line endings fixed."
     - name: Clean package directory
       run: |
         # Clean up any backup, temporary, or unwanted files that might confuse package builders
