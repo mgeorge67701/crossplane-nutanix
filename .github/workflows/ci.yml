@@ -146,11 +146,14 @@ jobs:
       run: |
         curl -sL https://cli.upbound.io | sh
         sudo mv up /usr/local/bin/
-    - name: Generate CRDs
-      run: make generate-crds
+    - name: Force copy of corrected CRDs
+      run: |
+        echo "Forcibly copying CRDs from config/crd to package/"
+        cp config/crd/*.yaml package/
     - name: Prepare package directory
       run: |
-        make copy-provider
+        # The copy-provider target is no longer needed as we are manually copying
+        # make copy-provider 
         # Clean up any backup, temporary, or unwanted files that might confuse package builders
         find package/ -name "*.tmp" -delete || true
         find package/ -name "*.bak" -delete || true
