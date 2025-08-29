@@ -141,7 +141,6 @@ jobs:
     - name: Prepare package directory
       run: |
         make copy-provider
-        mv package/examples package/examples.bak
     - name: Sync README.md to crossplane.yaml annotation
       run: bash scripts/sync-readme.sh
     - name: Install Crossplane CLI
@@ -153,11 +152,21 @@ jobs:
       run: |
         VERSION=${GITHUB_REF_NAME:-$(git rev-parse --short HEAD)}
         echo "Building package version: $VERSION"
-        mv package/examples package/examples.bak
-        crank xpkg build --package-root=package --output=provider-nutanix-${VERSION}.xpkg || up xpkg build --package-root=package --output=provider-nutanix-${VERSION}.xpkg
-        mv package/examples.bak package/examples
-    - name: Restore examples
-      run: mv package/examples.bak package/examples
+        # Temporarily move examples if it exists to avoid validation conflicts
+        if [ -d "package/examples" ]; then
+          mv package/examples package/examples.bak
+          echo "Moved examples directory to examples.bak"
+        fi
+        # Try Crossplane CLI first, then fallback to Upbound CLI
+        if ! crank xpkg build --package-root=package --output=provider-nutanix-${VERSION}.xpkg; then
+          echo "Crossplane CLI failed, trying Upbound CLI..."
+          up xpkg build --package-root=package --output=provider-nutanix-${VERSION}.xpkg
+        fi
+        # Restore examples if we moved it
+        if [ -d "package/examples.bak" ]; then
+          mv package/examples.bak package/examples
+          echo "Restored examples directory"
+        fi
     - name: Upload package artifact
       uses: actions/upload-artifact@v4
       with:
@@ -188,11 +197,20 @@ jobs:
       run: |
         curl -sL https://cli.upbound.io | sh
         sudo mv up /usr/local/bin/
+    - name: Install Crossplane CLI
+      run: |
+        curl -sL https://releases.crossplane.io/stable/current/bin/linux_amd64/crank -o crank
+        chmod +x crank
+        sudo mv crank /usr/local/bin/
     - name: Build Crossplane package
       run: |
         # Build Linux/amd64 binary for the package
         make copy-provider
-        mv package/examples package/examples.bak
+        # Temporarily move examples if it exists to avoid validation conflicts
+        if [ -d "package/examples" ]; then
+          mv package/examples package/examples.bak
+          echo "Moved examples directory to examples.bak"
+        fi
         echo "--- Content of package/crossplane.yaml BEFORE sync ---"
         cat package/crossplane.yaml
         echo "--- Content of README.md ---"
@@ -202,8 +220,16 @@ jobs:
         cat package/crossplane.yaml
         VERSION=${GITHUB_REF_NAME#v}
         echo "Building package version: $VERSION"
-        up xpkg build --package-root=package --output=provider-nutanix-${VERSION}.xpkg || crank xpkg build --package-root=package --output=provider-nutanix-${VERSION}.xpkg
-        mv package/examples.bak package/examples
+        # Try Upbound CLI first, then fallback to Crossplane CLI
+        if ! up xpkg build --package-root=package --output=provider-nutanix-${VERSION}.xpkg; then
+          echo "Upbound CLI failed, trying Crossplane CLI..."
+          crank xpkg build --package-root=package --output=provider-nutanix-${VERSION}.xpkg
+        fi
+        # Restore examples if we moved it
+        if [ -d "package/examples.bak" ]; then
+          mv package/examples.bak package/examples
+          echo "Restored examples directory"
+        fi
         cp provider-nutanix-${VERSION}.xpkg dist/
     - name: Prepare release assets
       run: |
@@ -242,6 +268,11 @@ jobs:
       run: |
         curl -sL https://cli.upbound.io | sh
         sudo mv up /usr/local/bin/
+    - name: Install Crossplane CLI
+      run: |
+        curl -sL https://releases.crossplane.io/stable/current/bin/linux_amd64/crank -o crank
+        chmod +x crank
+        sudo mv crank /usr/local/bin/
     - name: Login to Upbound
       run: |
         echo "Logging in to Upbound..."
@@ -267,15 +298,27 @@ jobs:
     - name: Build Crossplane package
       run: |
         make copy-provider
-        mv package/examples package/examples.bak
+        # Temporarily move examples if it exists to avoid validation conflicts
+        if [ -d "package/examples" ]; then
+          mv package/examples package/examples.bak
+          echo "Moved examples directory to examples.bak"
+        fi
         VERSION=${GITHUB_REF_NAME#v}
         echo "Building package version: $VERSION"
         echo "Package will be built as: provider-nutanix-${VERSION}.xpkg"
         sed -i "s|image:.*|image: ghcr.io/mgeorge67701/provider-nutanix:${VERSION}|" package/crossplane.yaml
         
         bash scripts/sync-readme.sh
-        up xpkg build --package-root=package --output=provider-nutanix-${VERSION}.xpkg || crank xpkg build --package-root=package --output=provider-nutanix-${VERSION}.xpkg
-        mv package/examples.bak package/examples
+        # Try Upbound CLI first, then fallback to Crossplane CLI
+        if ! up xpkg build --package-root=package --output=provider-nutanix-${VERSION}.xpkg; then
+          echo "Upbound CLI failed, trying Crossplane CLI..."
+          crank xpkg build --package-root=package --output=provider-nutanix-${VERSION}.xpkg
+        fi
+        # Restore examples if we moved it
+        if [ -d "package/examples.bak" ]; then
+          mv package/examples.bak package/examples
+          echo "Restored examples directory"
+        fi
         ls -la provider-nutanix-${VERSION}.xpkg
         echo "Package size: $(du -h provider-nutanix-${VERSION}.xpkg)"
     - name: Login to Upbound
