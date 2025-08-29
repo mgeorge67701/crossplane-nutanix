@@ -31,12 +31,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
+    - name: Cache Go modules
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.24'
-        cache: true
-        cache-dependency-path: 'go.sum'
+        go-version: '1.25'
+        cache: false
     - name: Download dependencies
       run: |
         go clean -modcache || true
@@ -112,7 +120,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.24'
+        go-version: '1.25'
     - name: Build Crossplane Provider
       run: |
         mkdir -p dist
@@ -133,7 +141,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.24'
+        go-version: '1.25'
     - name: Install Upbound CLI
       run: |
         curl -sL https://cli.upbound.io | sh
@@ -189,7 +197,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.24'
+        go-version: '1.25'
     - name: Build all platforms
       run: |
         mkdir -p dist
@@ -268,7 +276,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.24'
+        go-version: '1.25'
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
     - name: Install Upbound CLI
