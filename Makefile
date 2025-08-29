@@ -11,6 +11,12 @@ generate:
 	@which controller-gen || go install sigs.k8s.io/controller-tools/cmd/controller-gen@latest
 	@controller-gen object:headerFile="hack/boilerplate.go.txt" paths="./apis/..."
 
+# Generate CRDs
+generate-crds:
+	@echo "Generating CRDs..."
+	@which controller-gen || go install sigs.k8s.io/controller-tools/cmd/controller-gen@latest
+	@controller-gen crd:generateEmbeddedObjectMeta=true paths="./apis/..." output:crd:artifacts:config=config/crd
+
 # Build for current platform
 build:
 	@mkdir -p bin
@@ -37,12 +43,15 @@ package-dir:
 
 copy-provider: package-dir
 	$(MAKE) build GOOS=linux GOARCH=amd64
+	$(MAKE) generate-crds
 	cp bin/provider package/
 	cp config/crd/nutanix.crossplane.io_*.yaml package/
 
 # Help
 help:
 	@echo "Available targets:"
+	@echo "  generate      - Generate deepcopy methods"
+	@echo "  generate-crds - Generate CRD YAML files"
 	@echo "  build         - Build for current platform (default: linux/amd64)"
 	@echo "  build-macbook - Build for MacBook (Apple Silicon)"
 	@echo "  build-linux   - Build for Linux (x86_64)"
@@ -50,4 +59,4 @@ help:
 	@echo "  build-all     - Build for all platforms"
 	@echo "  copy-provider - Copy provider binary to package directory"
 
-.PHONY: generate build build-macbook build-linux build-pi5 build-all package-dir copy-provider help
+.PHONY: generate generate-crds build build-macbook build-linux build-pi5 build-all package-dir copy-provider help
