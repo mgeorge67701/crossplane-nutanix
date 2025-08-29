@@ -159,17 +159,27 @@ jobs:
         # that can cause the package builder to try parsing them as actual resources
         python3 -c "
         import re
+        import yaml
+        
         with open('package/crossplane.yaml', 'r') as f:
             content = f.read()
         
-        # Remove YAML code blocks that contain apiVersion references
-        # This prevents the package builder from trying to parse documentation examples
-        pattern = r'```yaml.*?```'
-        replacement = '```yaml\n# YAML examples removed during package build\n# See repository examples/ directory for complete examples\n```'
-        content = re.sub(pattern, replacement, content, flags=re.DOTALL)
+        # Parse the YAML to work with the structure properly
+        data = yaml.safe_load(content)
         
+        # Clean the readme annotation by removing YAML code blocks
+        if 'metadata' in data and 'annotations' in data['metadata']:
+            readme = data['metadata']['annotations'].get('meta.crossplane.io/readme', '')
+            if readme:
+                # Remove YAML code blocks from the readme annotation
+                pattern = r'```yaml.*?```'
+                replacement = '```yaml\n# YAML examples removed during package build\n# See repository examples/ directory for complete examples\n```'
+                cleaned_readme = re.sub(pattern, replacement, readme, flags=re.DOTALL)
+                data['metadata']['annotations']['meta.crossplane.io/readme'] = cleaned_readme
+        
+        # Write back the cleaned YAML
         with open('package/crossplane.yaml', 'w') as f:
-            f.write(content)
+            yaml.dump(data, f, default_flow_style=False, width=1000, allow_unicode=True)
         "
         echo "Cleaned crossplane.yaml - removed embedded YAML examples"
     - name: Install Crossplane CLI
@@ -245,16 +255,27 @@ jobs:
         # Remove YAML examples from crossplane.yaml to prevent parsing issues
         python3 -c "
         import re
+        import yaml
+        
         with open('package/crossplane.yaml', 'r') as f:
             content = f.read()
         
-        # Remove YAML code blocks that contain apiVersion references
-        pattern = r'```yaml.*?```'
-        replacement = '```yaml\n# YAML examples removed during package build\n# See repository examples/ directory for complete examples\n```'
-        content = re.sub(pattern, replacement, content, flags=re.DOTALL)
+        # Parse the YAML to work with the structure properly
+        data = yaml.safe_load(content)
         
+        # Clean the readme annotation by removing YAML code blocks
+        if 'metadata' in data and 'annotations' in data['metadata']:
+            readme = data['metadata']['annotations'].get('meta.crossplane.io/readme', '')
+            if readme:
+                # Remove YAML code blocks from the readme annotation
+                pattern = r'```yaml.*?```'
+                replacement = '```yaml\n# YAML examples removed during package build\n# See repository examples/ directory for complete examples\n```'
+                cleaned_readme = re.sub(pattern, replacement, readme, flags=re.DOTALL)
+                data['metadata']['annotations']['meta.crossplane.io/readme'] = cleaned_readme
+        
+        # Write back the cleaned YAML
         with open('package/crossplane.yaml', 'w') as f:
-            f.write(content)
+            yaml.dump(data, f, default_flow_style=False, width=1000, allow_unicode=True)
         "
         echo "--- Content of package/crossplane.yaml AFTER sync ---"
         cat package/crossplane.yaml
@@ -350,16 +371,27 @@ jobs:
         # Remove YAML examples from crossplane.yaml to prevent parsing issues
         python3 -c "
         import re
+        import yaml
+        
         with open('package/crossplane.yaml', 'r') as f:
             content = f.read()
         
-        # Remove YAML code blocks that contain apiVersion references
-        pattern = r'```yaml.*?```'
-        replacement = '```yaml\n# YAML examples removed during package build\n# See repository examples/ directory for complete examples\n```'
-        content = re.sub(pattern, replacement, content, flags=re.DOTALL)
+        # Parse the YAML to work with the structure properly
+        data = yaml.safe_load(content)
         
+        # Clean the readme annotation by removing YAML code blocks
+        if 'metadata' in data and 'annotations' in data['metadata']:
+            readme = data['metadata']['annotations'].get('meta.crossplane.io/readme', '')
+            if readme:
+                # Remove YAML code blocks from the readme annotation
+                pattern = r'```yaml.*?```'
+                replacement = '```yaml\n# YAML examples removed during package build\n# See repository examples/ directory for complete examples\n```'
+                cleaned_readme = re.sub(pattern, replacement, readme, flags=re.DOTALL)
+                data['metadata']['annotations']['meta.crossplane.io/readme'] = cleaned_readme
+        
+        # Write back the cleaned YAML
         with open('package/crossplane.yaml', 'w') as f:
-            f.write(content)
+            yaml.dump(data, f, default_flow_style=False, width=1000, allow_unicode=True)
         "
         # Try Upbound CLI first, then fallback to Crossplane CLI
         if ! up xpkg build --package-root=package --output=provider-nutanix-${VERSION}.xpkg; then
