@@ -107,7 +107,9 @@ spec:
                     - namespace
                     type: object
                   source:
-                    description: Source of the provider credentials.
+                    description: |-
+                      A CredentialsSource is a source from which provider credentials may be
+                      acquired.
                     enum:
                     - None
                     - Secret
@@ -164,7 +166,9 @@ spec:
                       - namespace
                       type: object
                     source:
-                      description: Source of the provider credentials.
+                      description: |-
+                        A CredentialsSource is a source from which provider credentials may be
+                        acquired.
                       enum:
                       - None
                       - Secret
