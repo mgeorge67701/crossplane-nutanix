@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/mgeorge67701/provider-nutanix/apis/v1alpha1"
@@ -417,8 +418,16 @@ func (r *VirtualMachineReconciler) Reconcile(ctx context.Context, req reconcile.
 
 // containsIgnoreCase checks if s contains substr, case-insensitive
 func containsIgnoreCase(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || (len(substr) > 0 && containsIgnoreCase(s[1:], substr))) ||
-		(len(substr) > 0 && (len(s) > 0 && (s[0]|32) == (substr[0]|32) && containsIgnoreCase(s[1:], substr[1:])))
+	// Empty substring is always contained in any string
+	if len(substr) == 0 {
+		return true
+	}
+	// If string is shorter than substring, it can't contain it
+	if len(s) < len(substr) {
+		return false
+	}
+	// Use strings.Contains with lowercase conversion for simplicity
+	return strings.Contains(strings.ToLower(s), strings.ToLower(substr))
 }
 
 func SetupVirtualMachine(mgr manager.Manager, l logging.Logger) error {
