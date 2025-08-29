@@ -146,6 +146,8 @@ jobs:
       run: |
         curl -sL https://cli.upbound.io | sh
         sudo mv up /usr/local/bin/
+    - name: Generate CRDs
+      run: make generate-crds
     - name: Prepare package directory
       run: |
         make copy-provider
