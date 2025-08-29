@@ -139,14 +139,18 @@ jobs:
         curl -sL https://cli.upbound.io | sh
         sudo mv up /usr/local/bin/
     - name: Prepare package directory
-      run: make copy-provider
+      run: |
+        make copy-provider
+        mv package/examples package/examples.bak
     - name: Sync README.md to crossplane.yaml annotation
       run: bash scripts/sync-readme.sh
     - name: Build Crossplane package
       run: |
         VERSION=${GITHUB_REF_NAME:-$(git rev-parse --short HEAD)}
         echo "Building package version: $VERSION"
-        up xpkg build --package-root=package --output=provider-nutanix-${VERSION}.xpkg --ignore=examples
+        up xpkg build --package-root=package --output=provider-nutanix-${VERSION}.xpkg
+    - name: Restore examples
+      run: mv package/examples.bak package/examples
     - name: Upload package artifact
       uses: actions/upload-artifact@v4
       with:
@@ -181,6 +185,7 @@ jobs:
       run: |
         # Build Linux/amd64 binary for the package
         make copy-provider
+        mv package/examples package/examples.bak
         echo "--- Content of package/crossplane.yaml BEFORE sync ---"
         cat package/crossplane.yaml
         echo "--- Content of README.md ---"
@@ -190,7 +195,8 @@ jobs:
         cat package/crossplane.yaml
         VERSION=${GITHUB_REF_NAME#v}
         echo "Building package version: $VERSION"
-        up xpkg build --package-root=package --output=provider-nutanix-${VERSION}.xpkg --ignore=examples
+        up xpkg build --package-root=package --output=provider-nutanix-${VERSION}.xpkg
+        mv package/examples.bak package/examples
         cp provider-nutanix-${VERSION}.xpkg dist/
     - name: Prepare release assets
       run: |
@@ -254,13 +260,15 @@ jobs:
     - name: Build Crossplane package
       run: |
         make copy-provider
+        mv package/examples package/examples.bak
         VERSION=${GITHUB_REF_NAME#v}
         echo "Building package version: $VERSION"
         echo "Package will be built as: provider-nutanix-${VERSION}.xpkg"
         sed -i "s|image:.*|image: ghcr.io/mgeorge67701/provider-nutanix:${VERSION}|" package/crossplane.yaml
         
         bash scripts/sync-readme.sh
-        up xpkg build --package-root=package --output=provider-nutanix-${VERSION}.xpkg --ignore=examples
+        up xpkg build --package-root=package --output=provider-nutanix-${VERSION}.xpkg
+        mv package/examples.bak package/examples
         ls -la provider-nutanix-${VERSION}.xpkg
         echo "Package size: $(du -h provider-nutanix-${VERSION}.xpkg)"
     - name: Login to Upbound

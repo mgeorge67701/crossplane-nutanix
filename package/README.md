@@ -38,17 +38,24 @@ spec:
   name: "my-crossplane-vm"
   numVcpus: 2
   memorySizeMib: 4096
-  clusterUuid: "00000000-0000-0000-0000-000000000000"  # Replace with your cluster UUID
-  subnetUuid: "11111111-1111-1111-1111-111111111111"   # Replace with your subnet UUID
-  imageUuid: "22222222-2222-2222-2222-222222222222"    # Replace with your image UUID
+  clusterName: "aza-ntnx-01"
+  imageName: "ubuntu-22.04-cloud"
+  additionalDisks:
+    - deviceIndex: 1
+      sizeGb: 20
+    - deviceIndex: 2
+      sizeGb: 100
+  externalFacts:
+    bt_product: "inf"
+    another_fact: "value"
 ```
 
 ## Finding UUIDs
 
-To find the required UUIDs for your Nutanix environment:
+You can still look up UUIDs manually in Prism Central if needed:
 
 - **Cluster UUID**: Prism Central → Home → Infrastructure → Clusters
-- **Subnet UUID**: Prism Central → Network & Security → Subnets
+- **Subnet UUID**: Prism Central → Network & Security → Subnets  
 - **Image UUID**: Prism Central → Compute & Storage → Images
 
 ## Resources
