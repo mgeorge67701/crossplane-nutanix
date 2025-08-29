@@ -146,7 +146,7 @@ jobs:
       run: |
         VERSION=${GITHUB_REF_NAME:-$(git rev-parse --short HEAD)}
         echo "Building package version: $VERSION"
-        up xpkg build --package-root=package --output=provider-nutanix-${VERSION}.xpkg
+        up xpkg build --package-root=package --output=provider-nutanix-${VERSION}.xpkg --ignore=examples
     - name: Upload package artifact
       uses: actions/upload-artifact@v4
       with:
@@ -190,7 +190,7 @@ jobs:
         cat package/crossplane.yaml
         VERSION=${GITHUB_REF_NAME#v}
         echo "Building package version: $VERSION"
-        up xpkg build --package-root=package --output=provider-nutanix-${VERSION}.xpkg
+        up xpkg build --package-root=package --output=provider-nutanix-${VERSION}.xpkg --ignore=examples
         cp provider-nutanix-${VERSION}.xpkg dist/
     - name: Prepare release assets
       run: |
@@ -260,7 +260,7 @@ jobs:
         sed -i "s|image:.*|image: ghcr.io/mgeorge67701/provider-nutanix:${VERSION}|" package/crossplane.yaml
         
         bash scripts/sync-readme.sh
-        up xpkg build --package-root=package --output=provider-nutanix-${VERSION}.xpkg
+        up xpkg build --package-root=package --output=provider-nutanix-${VERSION}.xpkg --ignore=examples
         ls -la provider-nutanix-${VERSION}.xpkg
         echo "Package size: $(du -h provider-nutanix-${VERSION}.xpkg)"
     - name: Login to Upbound

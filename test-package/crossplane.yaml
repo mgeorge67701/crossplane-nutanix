@@ -1,0 +1,170 @@
+apiVersion: meta.pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-nutanix
+  annotations:
+    meta.crossplane.io/maintainer: Crossplane Community <info@crossplane.io>
+    meta.crossplane.io/source: github.com/mgeorge67701/crossplane-nutanix
+    meta.crossplane.io/license: Apache-2.0
+    meta.crossplane.io/description: |
+      The Nutanix Crossplane provider enables infrastructure management on
+      Nutanix clusters. This provider allows you to create and manage Nutanix
+      virtual machines using Kubernetes-style declarative configuration.
+      
+      Features:
+      - Create and manage Nutanix VMs with configurable CPU, memory, and disk
+      - Integration with Nutanix Prism Central API
+      - Support for Crossplane compositions and composite resources
+      
+      📚 Getting Started:
+      This package includes complete examples and documentation:
+      - Quick Start guide with step-by-step instructions
+      - Provider configuration examples
+      - Virtual machine creation examples
+      - Advanced usage patterns and compositions
+      
+      All examples are included in this package for immediate use!
+    meta.crossplane.io/readme: |
+      # Nutanix Crossplane Provider
+
+      A Crossplane provider for managing Nutanix infrastructure resources through Kubernetes APIs.
+
+      [![CI](https://github.com/mgeorge67701/provider-nutanix/actions/workflows/ci.yml/badge.svg)](https://github.com/mgeorge67701/provider-nutanix/actions/workflows/ci.yml)
+      [![Upbound Marketplace](https://img.shields.io/badge/Upbound-Marketplace-blue)](https://marketplace.upbound.io/providers/mgeorge67701/provider-nutanix)
+
+      ## Features
+
+      - **Virtual Machines**: Create and manage Nutanix VMs with configurable CPU, memory, and storage
+      - **Provider Configuration**: Secure authentication with Nutanix Prism Central
+      - **Crossplane Integration**: Full integration with Crossplane compositions and composite resources
+
+      ## Quick Start
+
+      ### Prerequisites
+
+      - Kubernetes cluster with [Crossplane](https://crossplane.io/) installed
+      - Nutanix Prism Central access with admin credentials
+
+      ### Installation
+
+      Install the provider from Upbound Marketplace:
+
+      ```bash
+      kubectl apply -f - <<EOF
+      apiVersion: pkg.crossplane.io/v1
+      kind: Provider
+      metadata:
+        name: provider-nutanix
+      spec:
+        package: xpkg.upbound.io/mgeorge67701/provider-nutanix:latest
+      EOF
+      ```
+
+      ### Configuration
+
+      Create a secret with your Nutanix credentials:
+
+      ```bash
+      kubectl create secret generic nutanix-creds -n crossplane-system \
+        --from-literal=credentials='{"endpoint":"https://prism-central.example.com:9440","username":"admin","password":"your-password"}'
+      ```
+
+      Create a ProviderConfig:
+
+      ```yaml
+      apiVersion: nutanix.crossplane.io/v1beta1
+      kind: ProviderConfig
+      metadata:
+        name: default
+      spec:
+        credentials:
+          source: Secret
+          secretRef:
+            namespace: crossplane-system
+            name: nutanix-creds
+            key: credentials
+      ```
+
+      ## Usage Examples
+
+      ### Create a Virtual Machine
+
+      ```yaml
+      apiVersion: nutanix.crossplane.io/v1alpha1
+      kind: VirtualMachine
+      metadata:
+        name: example-vm
+      spec:
+        name: "my-crossplane-vm"
+        numVcpus: 2
+        memorySizeMib: 4096
+        clusterName: "aza-ntnx-01"
+        imageName: "ubuntu-22.04-cloud"
+        additionalDisks:
+          - deviceIndex: 1
+            sizeGb: 20
+          - deviceIndex: 2
+            sizeGb: 100
+        externalFacts:
+          bt_product: "inf"
+          another_fact: "value"
+      ```
+
+      ## Finding UUIDs
+
+      You can still look up UUIDs manually in Prism Central if needed:
+
+      - **Cluster UUID**: Prism Central → Home → Infrastructure → Clusters
+      - **Subnet UUID**: Prism Central → Network & Security → Subnets
+      - **Image UUID**: Prism Central → Compute & Storage → Images
+
+      ## Examples
+
+      This package includes comprehensive examples in the `examples/` directory:
+
+      - `providerconfig.yaml`: Basic ProviderConfig setup
+      - `virtualmachine.yaml`: Virtual machine creation example
+
+      ## Advanced Usage
+
+      ### Compositions
+
+      You can create reusable compositions to simplify VM creation:
+
+      ```yaml
+      apiVersion: apiextensions.crossplane.io/v1
+      kind: Composition
+      metadata:
+        name: web-server-vm
+      spec:
+        compositeTypeRef:
+          apiVersion: example.com/v1alpha1
+          kind: WebServerVM
+        resources:
+        - name: vm
+          base:
+            apiVersion: nutanix.crossplane.io/v1alpha1
+            kind: VirtualMachine
+            spec:
+              numVcpus: 2
+              memorySizeMib: 4096
+          patches:
+          - type: FromCompositeFieldPath
+            fromFieldPath: spec.clusterUuid
+            toFieldPath: spec.clusterUuid
+      ```
+
+      ## Support
+
+      For issues and questions:
+      - GitHub Issues: https://github.com/mgeorge67701/provider-nutanix/issues
+      - Crossplane Slack: https://slack.crossplane.io/
+
+      ## Resources
+
+      - [Nutanix Documentation](https://portal.nutanix.com/page/documents)
+      - [Crossplane Documentation](https://docs.crossplane.io/)
+      - [Provider Source Code](https://github.com/mgeorge67701/provider-nutanix)
+spec:
+  controller:
+    image: ghcr.io/mgeorge67701/provider-nutanix:latest
