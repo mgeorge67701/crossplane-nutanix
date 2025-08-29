@@ -149,7 +149,7 @@ jobs:
     - name: Force copy of corrected CRDs
       run: |
         echo "Forcibly copying CRDs from config/crd to package/"
-        cp config/crd/*.yaml package/
+        cp config/crd/nutanix.crossplane.io_*.yaml package/
     - name: Prepare package directory
       run: |
         # The copy-provider target is no longer needed as we are manually copying
