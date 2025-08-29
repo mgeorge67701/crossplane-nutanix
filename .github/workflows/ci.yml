@@ -138,6 +138,8 @@ jobs:
       run: |
         curl -sL https://cli.upbound.io | sh
         sudo mv up /usr/local/bin/
+    - name: Prepare package directory
+      run: make copy-provider
     - name: Sync README.md to crossplane.yaml annotation
       run: bash scripts/sync-readme.sh
     - name: Build Crossplane package
