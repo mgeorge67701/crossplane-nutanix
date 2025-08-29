@@ -46,6 +46,8 @@ provider-nutanix
 *.xpkg
 *.tar.gz
 *.zip
+package/
+bin/
 
 # Package build directory contents (but keep the directory structure)
 package/provider

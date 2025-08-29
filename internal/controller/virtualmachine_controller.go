@@ -86,8 +86,6 @@ func fetchAvailabilityZoneMapping(url string) (map[string]string, map[string]boo
 	return mapping, enabledMap, nil
 }
 
-// ...existing code...
-
 type VirtualMachineReconciler struct {
 	client.Client
 	log logging.Logger
@@ -136,14 +134,14 @@ func (r *VirtualMachineReconciler) Reconcile(ctx context.Context, req reconcile.
 	r.log.Debug("Reconciling Nutanix VirtualMachine", "name", req.NamespacedName)
 
 	var vm v1alpha1.VirtualMachine
-	if err := r.Get(ctx, req.NamespacedName, &vm); err != nil {
+	if err := r.Client.Get(ctx, req.NamespacedName, &vm); err != nil {
 		return reconcile.Result{}, client.IgnoreNotFound(err)
 	}
 
 	// Load ProviderConfig
 	var pc v1beta1.ProviderConfig
 	// Assuming the provider config is named "default", adjust if necessary
-	if err := r.Get(ctx, client.ObjectKey{Name: "default"}, &pc); err != nil {
+	if err := r.Client.Get(ctx, client.ObjectKey{Name: "default"}, &pc); err != nil {
 		return reconcile.Result{}, err
 	}
 
@@ -223,7 +221,7 @@ func (r *VirtualMachineReconciler) Reconcile(ctx context.Context, req reconcile.
 	secretRef := currentCreds.SecretRef
 
 	var secret corev1.Secret
-	if err := r.Get(ctx, client.ObjectKey{Namespace: secretRef.Namespace, Name: secretRef.Name}, &secret); err != nil {
+	if err := r.Client.Get(ctx, client.ObjectKey{Namespace: secretRef.Namespace, Name: secretRef.Name}, &secret); err != nil {
 		return reconcile.Result{}, err
 	}
 	creds := struct {
@@ -274,7 +272,7 @@ func (r *VirtualMachineReconciler) Reconcile(ctx context.Context, req reconcile.
 		}
 		vm.Status.VMID = id
 		vm.Status.State = "Created"
-		if err := r.Status().Update(ctx, &vm); err != nil {
+		if err := r.Client.Status().Update(ctx, &vm); err != nil {
 			return reconcile.Result{}, err
 		}
 		return reconcile.Result{}, nil

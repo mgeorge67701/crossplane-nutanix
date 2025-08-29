@@ -74,7 +74,7 @@ spec:
                         description: Name is the name of an environment variable.
                         type: string
                     required:
-                      - name
+                    - name
                     type: object
                   fs:
                     description: |-
@@ -85,7 +85,7 @@ spec:
                         description: Path is a filesystem path.
                         type: string
                     required:
-                      - path
+                    - path
                     type: object
                   secretRef:
                     description: |-
@@ -102,21 +102,21 @@ spec:
                         description: Namespace of the secret.
                         type: string
                     required:
-                      - key
-                      - name
-                      - namespace
+                    - key
+                    - name
+                    - namespace
                     type: object
                   source:
                     description: Source of the provider credentials.
                     enum:
-                      - None
-                      - Secret
-                      - InjectedIdentity
-                      - Environment
-                      - Filesystem
+                    - None
+                    - Secret
+                    - InjectedIdentity
+                    - Environment
+                    - Filesystem
                     type: string
                 required:
-                  - source
+                - source
                 type: object
               datacenterCredentials:
                 additionalProperties:
@@ -131,7 +131,7 @@ spec:
                           description: Name is the name of an environment variable.
                           type: string
                       required:
-                        - name
+                      - name
                       type: object
                     fs:
                       description: |-
@@ -142,7 +142,7 @@ spec:
                           description: Path is a filesystem path.
                           type: string
                       required:
-                        - path
+                      - path
                       type: object
                     secretRef:
                       description: |-
@@ -159,21 +159,21 @@ spec:
                           description: Namespace of the secret.
                           type: string
                       required:
-                        - key
-                        - name
-                        - namespace
+                      - key
+                      - name
+                      - namespace
                       type: object
                     source:
                       description: Source of the provider credentials.
                       enum:
-                        - None
-                        - Secret
-                        - InjectedIdentity
-                        - Environment
-                        - Filesystem
+                      - None
+                      - Secret
+                      - InjectedIdentity
+                      - Environment
+                      - Filesystem
                       type: string
                   required:
-                    - source
+                  - source
                   type: object
                 description: |-
                   DatacenterCredentials maps datacenter names to their specific credentials.
@@ -196,7 +196,7 @@ spec:
                   This allows dynamic selection of the Prism Central based on the datacenter specified in the VM spec.
                 type: object
             required:
-              - credentials
+            - credentials
             type: object
           status:
             description: A ProviderConfigStatus defines the observed status of a ProviderConfig.
@@ -238,10 +238,10 @@ spec:
                         a resource at any point in time.
                       type: string
                   required:
-                    - lastTransitionTime
-                    - reason
-                    - status
-                    - type
+                  - lastTransitionTime
+                  - reason
+                  - status
+                  - type
                   type: object
                 type: array
                 x-kubernetes-list-map-keys:
@@ -253,7 +253,7 @@ spec:
                 type: integer
             type: object
         required:
-          - spec
+        - spec
         type: object
     served: true
     storage: true
