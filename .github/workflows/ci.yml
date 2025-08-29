@@ -151,8 +151,6 @@ jobs:
         rm -rf package/examples
         echo "Package directory contents:"
         ls -la package/
-    - name: Sync README.md to crossplane.yaml annotation
-      run: bash scripts/sync-readme.sh
     - name: Remove YAML examples from crossplane.yaml to prevent parsing issues
       run: |
         # Simply remove all YAML code blocks to prevent parsing issues
@@ -224,16 +222,13 @@ jobs:
         rm -f package/README.md
         # Remove examples directory if it exists to avoid validation conflicts
         rm -rf package/examples
-        echo "--- Content of package/crossplane.yaml BEFORE sync ---"
+        echo "--- Content of package/crossplane.yaml BEFORE cleaning ---"
         cat package/crossplane.yaml
-        echo "--- Content of README.md ---"
-        cat README.md
-        bash scripts/sync-readme.sh # Added: Sync README.md to crossplane.yaml annotation
         # Remove YAML examples from crossplane.yaml to prevent parsing issues
         echo "Cleaning YAML code blocks from crossplane.yaml..."
         perl -i -0pe 's/```yaml.*?```/```yaml\n# YAML examples removed during package build\n# See repository examples directory for complete examples\n```/gms' package/crossplane.yaml
         echo "Cleaned crossplane.yaml - removed embedded YAML examples"
-        echo "--- Content of package/crossplane.yaml AFTER sync ---"
+        echo "--- Content of package/crossplane.yaml AFTER cleaning ---"
         cat package/crossplane.yaml
         VERSION=${GITHUB_REF_NAME#v}
         echo "Building package version: $VERSION"
@@ -323,7 +318,6 @@ jobs:
         echo "Package will be built as: provider-nutanix-${VERSION}.xpkg"
         sed -i "s|image:.*|image: ghcr.io/mgeorge67701/provider-nutanix:${VERSION}|" package/crossplane.yaml
         
-        bash scripts/sync-readme.sh
         # Remove YAML examples from crossplane.yaml to prevent parsing issues
         echo "Cleaning YAML code blocks from crossplane.yaml..."
         perl -i -0pe 's/```yaml.*?```/```yaml\n# YAML examples removed during package build\n# See repository examples directory for complete examples\n```/gms' package/crossplane.yaml
