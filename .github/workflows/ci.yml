@@ -141,9 +141,15 @@ jobs:
     - name: Prepare package directory
       run: |
         make copy-provider
-        # Clean up any backup or temporary files that might confuse package builders
+        # Clean up any backup, temporary, or unwanted files that might confuse package builders
         find package/ -name "*.tmp" -delete || true
         find package/ -name "*.bak" -delete || true
+        find package/ -name "*.backup" -delete || true
+        # Remove any README.md from package directory to avoid "not exactly one package meta type" error
+        rm -f package/README.md
+        # Remove examples directory if it exists to avoid validation conflicts
+        rm -rf package/examples
+        echo "Package directory contents:"
         ls -la package/
     - name: Sync README.md to crossplane.yaml annotation
       run: bash scripts/sync-readme.sh
@@ -175,20 +181,14 @@ jobs:
       run: |
         VERSION=${GITHUB_REF_NAME:-$(git rev-parse --short HEAD)}
         echo "Building package version: $VERSION"
-        # Temporarily move examples if it exists to avoid validation conflicts
-        if [ -d "package/examples" ]; then
-          mv package/examples package/examples.bak
-          echo "Moved examples directory to examples.bak"
-        fi
-        # Try Upbound CLI with clean metadata (YAML examples can cause parsing issues)
+        echo "Final package directory contents before build:"
+        ls -la package/
+        # Ensure no examples directory exists to avoid validation conflicts
+        rm -rf package/examples
+        # Try Upbound CLI first (cleaner output), then fallback to Crossplane CLI
         if ! up xpkg build --package-root=package --output=provider-nutanix-${VERSION}.xpkg; then
           echo "Upbound CLI failed, trying Crossplane CLI as fallback..."
-          crank xpkg build --package-root=package --package-file=provider-nutanix-${VERSION}.xpkg --examples-root="" --ignore="examples/*"
-        fi
-        # Restore examples if we moved it
-        if [ -d "package/examples.bak" ]; then
-          mv package/examples.bak package/examples
-          echo "Restored examples directory"
+          crank xpkg build --package-root=package --package-file=provider-nutanix-${VERSION}.xpkg
         fi
     - name: Upload package artifact
       uses: actions/upload-artifact@v4
@@ -229,14 +229,14 @@ jobs:
       run: |
         # Build Linux/amd64 binary for the package
         make copy-provider
-        # Clean up any backup or temporary files that might confuse package builders
+        # Clean up any backup, temporary, or unwanted files that might confuse package builders
         find package/ -name "*.tmp" -delete || true
         find package/ -name "*.bak" -delete || true
-        # Temporarily move examples if it exists to avoid validation conflicts
-        if [ -d "package/examples" ]; then
-          mv package/examples package/examples.bak
-          echo "Moved examples directory to examples.bak"
-        fi
+        find package/ -name "*.backup" -delete || true
+        # Remove any README.md from package directory to avoid "not exactly one package meta type" error
+        rm -f package/README.md
+        # Remove examples directory if it exists to avoid validation conflicts
+        rm -rf package/examples
         echo "--- Content of package/crossplane.yaml BEFORE sync ---"
         cat package/crossplane.yaml
         echo "--- Content of README.md ---"
@@ -263,12 +263,7 @@ jobs:
         # Try Upbound CLI first, then fallback to Crossplane CLI
         if ! up xpkg build --package-root=package --output=provider-nutanix-${VERSION}.xpkg; then
           echo "Upbound CLI failed, trying Crossplane CLI..."
-          crank xpkg build --package-root=package --package-file=provider-nutanix-${VERSION}.xpkg --examples-root="" --ignore="examples/*"
-        fi
-        # Restore examples if we moved it
-        if [ -d "package/examples.bak" ]; then
-          mv package/examples.bak package/examples
-          echo "Restored examples directory"
+          crank xpkg build --package-root=package --package-file=provider-nutanix-${VERSION}.xpkg
         fi
         cp provider-nutanix-${VERSION}.xpkg dist/
     - name: Prepare release assets
@@ -338,14 +333,14 @@ jobs:
     - name: Build Crossplane package
       run: |
         make copy-provider
-        # Clean up any backup or temporary files that might confuse package builders
+        # Clean up any backup, temporary, or unwanted files that might confuse package builders
         find package/ -name "*.tmp" -delete || true
         find package/ -name "*.bak" -delete || true
-        # Temporarily move examples if it exists to avoid validation conflicts
-        if [ -d "package/examples" ]; then
-          mv package/examples package/examples.bak
-          echo "Moved examples directory to examples.bak"
-        fi
+        find package/ -name "*.backup" -delete || true
+        # Remove any README.md from package directory to avoid "not exactly one package meta type" error
+        rm -f package/README.md
+        # Remove examples directory if it exists to avoid validation conflicts
+        rm -rf package/examples
         VERSION=${GITHUB_REF_NAME#v}
         echo "Building package version: $VERSION"
         echo "Package will be built as: provider-nutanix-${VERSION}.xpkg"
@@ -369,12 +364,7 @@ jobs:
         # Try Upbound CLI first, then fallback to Crossplane CLI
         if ! up xpkg build --package-root=package --output=provider-nutanix-${VERSION}.xpkg; then
           echo "Upbound CLI failed, trying Crossplane CLI..."
-          crank xpkg build --package-root=package --package-file=provider-nutanix-${VERSION}.xpkg --examples-root="" --ignore="examples/*"
-        fi
-        # Restore examples if we moved it
-        if [ -d "package/examples.bak" ]; then
-          mv package/examples.bak package/examples
-          echo "Restored examples directory"
+          crank xpkg build --package-root=package --package-file=provider-nutanix-${VERSION}.xpkg
         fi
         ls -la provider-nutanix-${VERSION}.xpkg
         echo "Package size: $(du -h provider-nutanix-${VERSION}.xpkg)"

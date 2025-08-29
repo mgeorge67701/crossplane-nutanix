@@ -72,43 +72,18 @@ metadata:
       Create a ProviderConfig:
 
       ```yaml
-      apiVersion: nutanix.crossplane.io/v1beta1
-      kind: ProviderConfig
-      metadata:
-        name: default
-      spec:
-        credentials:
-          source: Secret
-          secretRef:
-            namespace: crossplane-system
-            name: nutanix-creds
-            key: credentials
-      ```
+# YAML examples removed during package build
+# See repository examples/ directory for complete examples
+```
 
       ## Usage Examples
 
       ### Create a Virtual Machine
 
       ```yaml
-      apiVersion: nutanix.crossplane.io/v1alpha1
-      kind: VirtualMachine
-      metadata:
-        name: example-vm
-      spec:
-        name: "my-crossplane-vm"
-        numVcpus: 2
-        memorySizeMib: 4096
-        clusterName: "aza-ntnx-01"
-        imageName: "ubuntu-22.04-cloud"
-        additionalDisks:
-          - deviceIndex: 1
-            sizeGb: 20
-          - deviceIndex: 2
-            sizeGb: 100
-        externalFacts:
-          bt_product: "inf"
-          another_fact: "value"
-      ```
+# YAML examples removed during package build
+# See repository examples/ directory for complete examples
+```
 
       ## Finding UUIDs
 
@@ -132,27 +107,9 @@ metadata:
       You can create reusable compositions to simplify VM creation:
 
       ```yaml
-      apiVersion: apiextensions.crossplane.io/v1
-      kind: Composition
-      metadata:
-        name: web-server-vm
-      spec:
-        compositeTypeRef:
-          apiVersion: example.com/v1alpha1
-          kind: WebServerVM
-        resources:
-        - name: vm
-          base:
-            apiVersion: nutanix.crossplane.io/v1alpha1
-            kind: VirtualMachine
-            spec:
-              numVcpus: 2
-              memorySizeMib: 4096
-          patches:
-          - type: FromCompositeFieldPath
-            fromFieldPath: spec.clusterUuid
-            toFieldPath: spec.clusterUuid
-      ```
+# YAML examples removed during package build
+# See repository examples/ directory for complete examples
+```
 
       ## Support
 
