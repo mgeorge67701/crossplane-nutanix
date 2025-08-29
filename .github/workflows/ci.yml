@@ -81,6 +81,17 @@ jobs:
       run: make generate-crds
     - name: Verify generated code compiles
       run: go build ./...
+    - name: Commit and push changes
+      run: |
+        git config --global user.name 'github-actions[bot]'
+        git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+        git add .
+        if ! git diff --staged --quiet; then
+          git commit -m "ci: Auto-generate and commit CRDs and Go code" --no-gpg-sign
+          git push
+        else
+          echo "No changes to commit."
+        fi
 
   validate-examples:
     runs-on: ubuntu-latest
