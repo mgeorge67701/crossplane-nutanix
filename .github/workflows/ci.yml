@@ -157,8 +157,8 @@ jobs:
           mv package/examples package/examples.bak
           echo "Moved examples directory to examples.bak"
         fi
-        # Try Crossplane CLI first, then fallback to Upbound CLI
-        if ! crank xpkg build --package-root=package --output=provider-nutanix-${VERSION}.xpkg; then
+        # Try Crossplane CLI first with examples excluded, then fallback to Upbound CLI
+        if ! crank xpkg build --package-root=package --package-file=provider-nutanix-${VERSION}.xpkg --examples-root="" --ignore="examples/*"; then
           echo "Crossplane CLI failed, trying Upbound CLI..."
           up xpkg build --package-root=package --output=provider-nutanix-${VERSION}.xpkg
         fi
@@ -223,7 +223,7 @@ jobs:
         # Try Upbound CLI first, then fallback to Crossplane CLI
         if ! up xpkg build --package-root=package --output=provider-nutanix-${VERSION}.xpkg; then
           echo "Upbound CLI failed, trying Crossplane CLI..."
-          crank xpkg build --package-root=package --output=provider-nutanix-${VERSION}.xpkg
+          crank xpkg build --package-root=package --package-file=provider-nutanix-${VERSION}.xpkg --examples-root="" --ignore="examples/*"
         fi
         # Restore examples if we moved it
         if [ -d "package/examples.bak" ]; then
@@ -312,7 +312,7 @@ jobs:
         # Try Upbound CLI first, then fallback to Crossplane CLI
         if ! up xpkg build --package-root=package --output=provider-nutanix-${VERSION}.xpkg; then
           echo "Upbound CLI failed, trying Crossplane CLI..."
-          crank xpkg build --package-root=package --output=provider-nutanix-${VERSION}.xpkg
+          crank xpkg build --package-root=package --package-file=provider-nutanix-${VERSION}.xpkg --examples-root="" --ignore="examples/*"
         fi
         # Restore examples if we moved it
         if [ -d "package/examples.bak" ]; then
