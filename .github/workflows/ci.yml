@@ -158,7 +158,9 @@ jobs:
         
         # Remove YAML code blocks that contain apiVersion references
         # This prevents the package builder from trying to parse documentation examples
-        content = re.sub(r'```[^`]*apiVersion:[^`]*```', '```\n      # YAML examples removed during package build\n      # See repository examples/ directory for complete examples\n      ```', content, flags=re.DOTALL)
+        pattern = r'```yaml.*?```'
+        replacement = '```yaml\n# YAML examples removed during package build\n# See repository examples/ directory for complete examples\n```'
+        content = re.sub(pattern, replacement, content, flags=re.DOTALL)
         
         with open('package/crossplane.yaml', 'w') as f:
             f.write(content)
@@ -245,7 +247,12 @@ jobs:
         import re
         with open('package/crossplane.yaml', 'r') as f:
             content = f.read()
-        content = re.sub(r'```[^`]*apiVersion:[^`]*```', '```\n      # YAML examples removed during package build\n      ```', content, flags=re.DOTALL)
+        
+        # Remove YAML code blocks that contain apiVersion references
+        pattern = r'```yaml.*?```'
+        replacement = '```yaml\n# YAML examples removed during package build\n# See repository examples/ directory for complete examples\n```'
+        content = re.sub(pattern, replacement, content, flags=re.DOTALL)
+        
         with open('package/crossplane.yaml', 'w') as f:
             f.write(content)
         "
@@ -350,7 +357,12 @@ jobs:
         import re
         with open('package/crossplane.yaml', 'r') as f:
             content = f.read()
-        content = re.sub(r'```[^`]*apiVersion:[^`]*```', '```\n      # YAML examples removed during package build\n      ```', content, flags=re.DOTALL)
+        
+        # Remove YAML code blocks that contain apiVersion references
+        pattern = r'```yaml.*?```'
+        replacement = '```yaml\n# YAML examples removed during package build\n# See repository examples/ directory for complete examples\n```'
+        content = re.sub(pattern, replacement, content, flags=re.DOTALL)
+        
         with open('package/crossplane.yaml', 'w') as f:
             f.write(content)
         "
