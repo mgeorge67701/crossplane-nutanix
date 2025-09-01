@@ -246,14 +246,28 @@ jobs:
         curl -sL https://releases.crossplane.io/stable/current/bin/linux_amd64/crank -o crank
         chmod +x crank
         sudo mv crank /usr/local/bin/
-    - name: Login to Upbound
+    - name: Configure Upbound Authentication
       run: |
-        echo "Logging in to Upbound..."
-        up login
-        echo "Login successful"
+        echo "Setting up Upbound authentication with token..."
+        # Create a config file with the token
+        mkdir -p ~/.up
+        cat > ~/.up/config.json << EOF
+        {
+          "profiles": {
+            "default": {
+              "id": "default",
+              "type": "token",
+              "base_config": {
+                "token": "${UPBOUND_TOKEN}"
+              }
+            }
+          },
+          "current": "default"
+        }
+        EOF
+        echo "Verifying authentication..."
         up profile current
       env:
-        UPBOUND_ACCESS_ID: ${{ secrets.UPBOUND_ACCESS_ID }}
         UPBOUND_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
     - name: Build and push Docker image to GitHub Container Registry
       run: |
@@ -282,14 +296,12 @@ jobs:
         tar -czf provider-nutanix-${VERSION}.xpkg -C package .
         ls -la provider-nutanix-${VERSION}.xpkg
         echo "Package size: $(du -h provider-nutanix-${VERSION}.xpkg)"
-    - name: Login to Upbound
+    - name: Verify Upbound Authentication
       run: |
-        echo "Logging in to Upbound..."
-        up login
-        echo "Login successful"
+        echo "Verifying Upbound authentication status..."
         up profile current
+        echo "Authentication verified successfully"
       env:
-        UPBOUND_ACCESS_ID: ${{ secrets.UPBOUND_ACCESS_ID }}
         UPBOUND_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
     - name: Verify package and repository
       run: |
