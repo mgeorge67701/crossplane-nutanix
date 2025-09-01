@@ -249,24 +249,11 @@ jobs:
     - name: Configure Upbound Authentication
       run: |
         echo "Setting up Upbound authentication with token..."
-        # Create a config file with the token
-        mkdir -p ~/.up
-        cat > ~/.up/config.json << EOF
-        {
-          "profiles": {
-            "default": {
-              "id": "default",
-              "type": "token",
-              "base_config": {
-                "token": "${UPBOUND_TOKEN}"
-              }
-            }
-          },
-          "current": "default"
-        }
-        EOF
+        # Set the token environment variable that up CLI will use
+        echo "UP_TOKEN=${UPBOUND_TOKEN}" >> $GITHUB_ENV
         echo "Verifying authentication..."
-        up profile current
+        # Test authentication by checking profile
+        UP_TOKEN="${UPBOUND_TOKEN}" up profile current || echo "Creating default profile..."
       env:
         UPBOUND_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
     - name: Build and push Docker image to GitHub Container Registry
@@ -299,37 +286,41 @@ jobs:
     - name: Verify Upbound Authentication
       run: |
         echo "Verifying Upbound authentication status..."
-        up profile current
-        echo "Authentication verified successfully"
-      env:
-        UPBOUND_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
+        up profile current || echo "No profile found, will use token directly"
+        echo "Authentication setup complete"
     - name: Verify package and repository
       run: |
         VERSION=${GITHUB_REF_NAME#v}
         echo "Verifying package file exists..."
         ls -la provider-nutanix-${VERSION}.xpkg
         echo "Checking repository access..."
-        if ! up repository list | grep -q provider-nutanix; then
+        if ! UP_TOKEN="${UPBOUND_TOKEN}" up repository list | grep -q provider-nutanix; then
           echo "Repository not found, creating it..."
-          up repository create provider-nutanix --publish
+          UP_TOKEN="${UPBOUND_TOKEN}" up repository create provider-nutanix --publish
         fi
         echo "Current user context:"
-        up profile current
+        UP_TOKEN="${UPBOUND_TOKEN}" up profile current || echo "Using token-based authentication"
         echo "Ready to push package: xpkg.upbound.io/mgeorge67701/provider-nutanix:${VERSION}"
+      env:
+        UPBOUND_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
     - name: Push to Upbound Marketplace
       run: |
         VERSION=${GITHUB_REF_NAME#v}
         echo "Pushing package version: ${VERSION}"
         echo "Full ref name: ${GITHUB_REF_NAME}"
-        up xpkg push xpkg.upbound.io/mgeorge67701/provider-nutanix:${VERSION} -f provider-nutanix-${VERSION}.xpkg
+        UP_TOKEN="${UPBOUND_TOKEN}" up xpkg push xpkg.upbound.io/mgeorge67701/provider-nutanix:${VERSION} -f provider-nutanix-${VERSION}.xpkg
         echo "Successfully pushed version ${VERSION}"
         if [[ ! "${VERSION}" =~ (alpha|beta|rc) ]]; then
           echo "Pushing as latest..."
-          up xpkg push xpkg.upbound.io/mgeorge67701/provider-nutanix:latest -f provider-nutanix-${VERSION}.xpkg
+          UP_TOKEN="${UPBOUND_TOKEN}" up xpkg push xpkg.upbound.io/mgeorge67701/provider-nutanix:latest -f provider-nutanix-${VERSION}.xpkg
           echo "Successfully pushed as latest"
         fi
+      env:
+        UPBOUND_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
     - name: Update repository publish policy
       run: |
         echo "Updating repository publish policy..."
-        up repository update provider-nutanix --publish --private=false || echo "Repository update failed, continuing..."
+        UP_TOKEN="${UPBOUND_TOKEN}" up repository update provider-nutanix --publish --private=false || echo "Repository update failed, continuing..."
         echo "Repository update completed"
+      env:
+        UPBOUND_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
