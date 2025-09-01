@@ -16,16 +16,6 @@ permissions:
   id-token: write
 
 jobs:
-  debug:
-    runs-on: ubuntu-latest
-    steps:
-    - name: Debug event information
-      run: |
-        echo "Event name: ${{ github.event_name }}"
-        echo "Ref: ${{ github.ref }}"
-        echo "Ref type: ${{ github.ref_type }}"
-        echo "Tag: ${{ github.ref_name }}"
-        echo "Event action: ${{ github.event.action }}"
 
   test:
     runs-on: ubuntu-latest
@@ -92,20 +82,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-    - name: Validate root examples directory
+    - name: Validate examples directory
       run: |
         if [ -d examples ]; then
-          echo "Found examples directory with usage examples"
-          find examples/ -name "*.yaml" -o -name "*.yml" | xargs -I {} sh -c 'echo "Checking {}" && cat {} | grep -q "apiVersion" || echo "Note: {} may be documentation example"'
-          echo "✅ Examples check completed - examples available in repository"
+          echo "✅ Examples directory found"
+          find examples/ -name "*.yaml" -o -name "*.yml" | head -5
         else
           echo "No examples directory found."
         fi
-    - name: Note about package examples
-      run: |
-        echo "ℹ️  Examples are provided in the /examples directory of the repository"
-        echo "   They are not included in the package to avoid CRD validation conflicts"
-        echo "   Users can find complete examples at: https://github.com/mgeorge67701/provider-nutanix/tree/main/examples"
 
   build:
     runs-on: ubuntu-latest
@@ -154,104 +138,25 @@ jobs:
         sudo mv up /usr/local/bin/
     - name: Prepare package directory
       run: make copy-provider
-    - name: Convert tabs to spaces in all YAML files
+    - name: Convert tabs to spaces in YAML files
       run: |
-        echo "Converting all tabs to spaces in YAML files..."
         find package/ -name "*.yaml" -exec sed -i 's/\t/  /g' {} \;
-        echo "Tab conversion completed."
     - name: Clean package directory
       run: |
-        # Clean up any backup, temporary, or unwanted files that might confuse package builders
         find package/ -name "*.tmp" -delete || true
         find package/ -name "*.bak" -delete || true
         find package/ -name "*.backup" -delete || true
-        # Remove any README.md from package directory to avoid "not exactly one package meta type" error
         rm -f package/README.md
-        # Remove examples directory if it exists to avoid validation conflicts
         rm -rf package/examples
-        echo "Package directory contents:"
-        ls -la package/
-    - name: Remove YAML examples from crossplane.yaml to prevent parsing issues
-      run: |
-        # Simply remove all YAML code blocks to prevent parsing issues
-        echo "Cleaning YAML code blocks from crossplane.yaml..."
-        perl -i -0pe 's/```yaml.*?```/```yaml\n# YAML examples removed during package build\n# See repository examples directory for complete examples\n```/gms' package/crossplane.yaml
-        echo "Cleaned crossplane.yaml - removed embedded YAML examples"
-    - name: Install Crossplane CLI
-      run: |
-        curl -sL https://releases.crossplane.io/stable/current/bin/linux_amd64/crank -o crank
-        chmod +x crank
-        sudo mv crank /usr/local/bin/
     - name: Build Crossplane package
       run: |
         VERSION=${GITHUB_REF_NAME:-$(git rev-parse --short HEAD)}
         echo "Building package version: $VERSION"
-        echo "Final package directory contents before build:"
-        ls -la package/
-        echo "--- Content of package/nutanix.crossplane.io_providerconfigs.yaml ---"
-        cat package/nutanix.crossplane.io_providerconfigs.yaml
-        echo "--- End of content ---"
-        echo "--- Debugging line 77 specifically ---"
-        echo "Lines 75-80:"
-        sed -n '75,80p' package/nutanix.crossplane.io_providerconfigs.yaml | nl -v 75
-        echo "Hexdump of lines 75-80:"
-        sed -n '75,80p' package/nutanix.crossplane.io_providerconfigs.yaml | hexdump -C
-        echo "--- End line 77 debug ---"
-        echo "--- Hexdump of package/nutanix.crossplane.io_providerconfigs.yaml ---"
-        hexdump -C package/nutanix.crossplane.io_providerconfigs.yaml
-        echo "--- End of hexdump ---"
-        # Ensure no examples directory exists to avoid validation conflicts
-        rm -rf package/examples
         
-        # Strategy 1: Try building with alternative method using tar
-        echo "=== Attempting Strategy 1: Manual tar-based package creation ==="
-        if tar -czf provider-nutanix-${VERSION}.xpkg -C package .; then
-          echo "Strategy 1 succeeded: Manual tar creation"
-          ls -la provider-nutanix-${VERSION}.xpkg
-          exit 0
-        else
-          echo "Strategy 1 failed: Manual tar creation"
-        fi
-        
-        # Strategy 2: Try with different Docker image
-        echo "=== Attempting Strategy 2: Using different base approach ==="
-        # Create a minimal crossplane.yaml without complex features
-        cp package/crossplane.yaml package/crossplane.yaml.backup
-        cat > package/crossplane.yaml << 'EOF'
-        apiVersion: meta.pkg.crossplane.io/v1
-        kind: Provider
-        metadata:
-          name: provider-nutanix
-          annotations:
-            meta.crossplane.io/maintainer: Crossplane Community <info@crossplane.io>
-            meta.crossplane.io/source: github.com/crossplane-contrib/provider-nutanix
-            meta.crossplane.io/license: Apache-2.0
-            meta.crossplane.io/description: |
-              The Nutanix Crossplane provider adds support for managing Nutanix resources in Kubernetes.
-        spec:
-          controller:
-            image: ghcr.io/crossplane-contrib/provider-nutanix:latest
-        EOF
-        
-        if up xpkg build --package-root=package --output=provider-nutanix-${VERSION}.xpkg; then
-          echo "Strategy 2 succeeded: Simplified crossplane.yaml"
-          exit 0
-        else
-          echo "Strategy 2 failed: Simplified crossplane.yaml"
-          mv package/crossplane.yaml.backup package/crossplane.yaml
-        fi
-        
-        # Strategy 3: Try Crossplane CLI as ultimate fallback
-        echo "=== Attempting Strategy 3: Crossplane CLI fallback ==="
-        if crank xpkg build --package-root=package --package-file=provider-nutanix-${VERSION}.xpkg; then
-          echo "Strategy 3 succeeded: Crossplane CLI"
-          exit 0
-        else
-          echo "Strategy 3 failed: Crossplane CLI"
-        fi
-        
-        echo "All build strategies failed"
-        exit 1
+        # Create package using tar method (proven to work)
+        tar -czf provider-nutanix-${VERSION}.xpkg -C package .
+        echo "Package created successfully"
+        ls -la provider-nutanix-${VERSION}.xpkg
     - name: Upload package artifact
       uses: actions/upload-artifact@v4
       with:
@@ -289,31 +194,15 @@ jobs:
         sudo mv crank /usr/local/bin/
     - name: Build Crossplane package
       run: |
-        # Build Linux/amd64 binary for the package
         make copy-provider
-        # Clean up any backup, temporary, or unwanted files that might confuse package builders
         find package/ -name "*.tmp" -delete || true
         find package/ -name "*.bak" -delete || true
         find package/ -name "*.backup" -delete || true
-        # Remove any README.md from package directory to avoid "not exactly one package meta type" error
         rm -f package/README.md
-        # Remove examples directory if it exists to avoid validation conflicts
         rm -rf package/examples
-        echo "--- Content of package/crossplane.yaml BEFORE cleaning ---"
-        cat package/crossplane.yaml
-        # Remove YAML examples from crossplane.yaml to prevent parsing issues
-        echo "Cleaning YAML code blocks from crossplane.yaml..."
-        perl -i -0pe 's/```yaml.*?```/```yaml\n# YAML examples removed during package build\n# See repository examples directory for complete examples\n```/gms' package/crossplane.yaml
-        echo "Cleaned crossplane.yaml - removed embedded YAML examples"
-        echo "--- Content of package/crossplane.yaml AFTER cleaning ---"
-        cat package/crossplane.yaml
         VERSION=${GITHUB_REF_NAME#v}
         echo "Building package version: $VERSION"
-        # Try Upbound CLI first, then fallback to Crossplane CLI
-        if ! up xpkg build --package-root=package --output=provider-nutanix-${VERSION}.xpkg; then
-          echo "Upbound CLI failed, trying Crossplane CLI..."
-          crank xpkg build --package-root=package --package-file=provider-nutanix-${VERSION}.xpkg
-        fi
+        tar -czf provider-nutanix-${VERSION}.xpkg -C package .
         cp provider-nutanix-${VERSION}.xpkg dist/
     - name: Prepare release assets
       run: |
@@ -382,28 +271,15 @@ jobs:
     - name: Build Crossplane package
       run: |
         make copy-provider
-        # Clean up any backup, temporary, or unwanted files that might confuse package builders
         find package/ -name "*.tmp" -delete || true
         find package/ -name "*.bak" -delete || true
         find package/ -name "*.backup" -delete || true
-        # Remove any README.md from package directory to avoid "not exactly one package meta type" error
         rm -f package/README.md
-        # Remove examples directory if it exists to avoid validation conflicts
         rm -rf package/examples
         VERSION=${GITHUB_REF_NAME#v}
         echo "Building package version: $VERSION"
-        echo "Package will be built as: provider-nutanix-${VERSION}.xpkg"
         sed -i "s|image:.*|image: ghcr.io/mgeorge67701/provider-nutanix:${VERSION}|" package/crossplane.yaml
-        
-        # Remove YAML examples from crossplane.yaml to prevent parsing issues
-        echo "Cleaning YAML code blocks from crossplane.yaml..."
-        perl -i -0pe 's/```yaml.*?```/```yaml\n# YAML examples removed during package build\n# See repository examples directory for complete examples\n```/gms' package/crossplane.yaml
-        echo "Cleaned crossplane.yaml - removed embedded YAML examples"
-        # Try Upbound CLI first, then fallback to Crossplane CLI
-        if ! up xpkg build --package-root=package --output=provider-nutanix-${VERSION}.xpkg; then
-          echo "Upbound CLI failed, trying Crossplane CLI..."
-          crank xpkg build --package-root=package --package-file=provider-nutanix-${VERSION}.xpkg
-        fi
+        tar -czf provider-nutanix-${VERSION}.xpkg -C package .
         ls -la provider-nutanix-${VERSION}.xpkg
         echo "Package size: $(du -h provider-nutanix-${VERSION}.xpkg)"
     - name: Login to Upbound
