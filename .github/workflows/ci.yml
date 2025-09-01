@@ -294,10 +294,16 @@ jobs:
         echo "Verifying package file exists..."
         ls -la provider-nutanix-${VERSION}.xpkg
         echo "Checking repository access..."
-        if ! UP_TOKEN="${UPBOUND_TOKEN}" up repository list | grep -q provider-nutanix; then
-          echo "Repository not found, creating it..."
-          UP_TOKEN="${UPBOUND_TOKEN}" up repository create provider-nutanix --publish
+        
+        # Try to list repositories and check if provider-nutanix exists
+        if UP_TOKEN="${UPBOUND_TOKEN}" up repository list | grep -q provider-nutanix; then
+          echo "Repository provider-nutanix found"
+        else
+          echo "Repository provider-nutanix not found"
+          echo "Note: Repository may need to be created manually via Upbound Console"
+          echo "Continuing with package push attempt..."
         fi
+        
         echo "Current user context:"
         UP_TOKEN="${UPBOUND_TOKEN}" up profile current || echo "Using token-based authentication"
         echo "Ready to push package: xpkg.upbound.io/mgeorge67701/provider-nutanix:${VERSION}"
@@ -308,19 +314,36 @@ jobs:
         VERSION=${GITHUB_REF_NAME#v}
         echo "Pushing package version: ${VERSION}"
         echo "Full ref name: ${GITHUB_REF_NAME}"
-        UP_TOKEN="${UPBOUND_TOKEN}" up xpkg push xpkg.upbound.io/mgeorge67701/provider-nutanix:${VERSION} -f provider-nutanix-${VERSION}.xpkg
-        echo "Successfully pushed version ${VERSION}"
-        if [[ ! "${VERSION}" =~ (alpha|beta|rc) ]]; then
-          echo "Pushing as latest..."
-          UP_TOKEN="${UPBOUND_TOKEN}" up xpkg push xpkg.upbound.io/mgeorge67701/provider-nutanix:latest -f provider-nutanix-${VERSION}.xpkg
-          echo "Successfully pushed as latest"
+        
+        # Attempt to push the package
+        if UP_TOKEN="${UPBOUND_TOKEN}" up xpkg push xpkg.upbound.io/mgeorge67701/provider-nutanix:${VERSION} -f provider-nutanix-${VERSION}.xpkg; then
+          echo "Successfully pushed version ${VERSION}"
+          
+          # Only push as latest if this is not a pre-release
+          if [[ ! "${VERSION}" =~ (alpha|beta|rc) ]]; then
+            echo "Pushing as latest..."
+            if UP_TOKEN="${UPBOUND_TOKEN}" up xpkg push xpkg.upbound.io/mgeorge67701/provider-nutanix:latest -f provider-nutanix-${VERSION}.xpkg; then
+              echo "Successfully pushed as latest"
+            else
+              echo "Warning: Failed to push as latest, but version push succeeded"
+            fi
+          fi
+        else
+          echo "Error: Failed to push package to Upbound Marketplace"
+          echo "This may be due to repository permissions or network issues"
+          echo "Package build was successful - manual upload may be required"
+          exit 1
         fi
       env:
         UPBOUND_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
     - name: Update repository publish policy
       run: |
         echo "Updating repository publish policy..."
-        UP_TOKEN="${UPBOUND_TOKEN}" up repository update provider-nutanix --publish --private=false || echo "Repository update failed, continuing..."
-        echo "Repository update completed"
+        if UP_TOKEN="${UPBOUND_TOKEN}" up repository update provider-nutanix --publish --private=false; then
+          echo "Repository publish policy updated successfully"
+        else
+          echo "Warning: Repository publish policy update failed - this is often expected for new repositories"
+          echo "Repository may need manual configuration in Upbound Console"
+        fi
       env:
         UPBOUND_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
