@@ -33,7 +33,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.25'
+        go-version: '1.24'
         cache: false
     - name: Download dependencies
       run: |
@@ -110,7 +110,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.25'
+        go-version: '1.24'
     - name: Build Crossplane Provider
       run: |
         mkdir -p dist
@@ -131,7 +131,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.25'
+        go-version: '1.24'
     - name: Install Upbound CLI
       run: |
         curl -sL https://cli.upbound.io | sh
@@ -171,7 +171,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.25'
+        go-version: '1.24'
     - name: Build all platforms
       run: |
         mkdir -p dist
@@ -234,7 +234,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.25'
+        go-version: '1.24'
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
     - name: Install Upbound CLI
