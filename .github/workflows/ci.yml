@@ -152,21 +152,8 @@ jobs:
       run: |
         curl -sL https://cli.upbound.io | sh
         sudo mv up /usr/local/bin/
-    - name: Generate CRDs
-      run: make generate-crds
     - name: Prepare package directory
       run: make copy-provider
-    - name: Force overwrite CRDs in package directory
-      run: |
-        echo "Forcibly overwriting CRDs in package/ with freshly generated ones"
-        cp -f config/crd/nutanix.crossplane.io_*.yaml package/
-    - name: Fix line endings in CRDs
-      run: |
-        echo "Converting CRLF to LF in CRD files to ensure consistent line endings..."
-        # Use dos2unix which is more reliable for line ending conversion
-        sudo apt-get update && sudo apt-get install -y dos2unix
-        find package/ -name "*.yaml" -exec dos2unix {} \;
-        echo "Line endings fixed with dos2unix."
     - name: Clean package directory
       run: |
         # Clean up any backup, temporary, or unwanted files that might confuse package builders

@@ -9,210 +9,252 @@ spec:
   group: nutanix.crossplane.io
   names:
     categories:
-      - crossplane
-      - provider
-      - nutanix
+    - crossplane
+    - provider
+    - nutanix
     kind: ProviderConfig
     listKind: ProviderConfigList
     plural: providerconfigs
     singular: providerconfig
   scope: Cluster
   versions:
-    - additionalPrinterColumns:
-        - jsonPath: .metadata.creationTimestamp
-          name: AGE
-          type: date
-        - jsonPath: .spec.credentials.secretRef.name
-          name: SECRET
-          priority: 1
-          type: string
-      name: v1beta1
-      schema:
-        openAPIV3Schema:
-          description: Nutanix provider configuration.
-          properties:
-            apiVersion:
-              description: API version of this object.
-              type: string
-            kind:
-              description: REST resource type.
-              type: string
-            metadata:
-              type: object
-            spec:
-              description: Desired state of the provider config.
-              properties:
-                allowedLobs:
-                  description: Allowed Line of Business values for VMs.
-                  items:
-                    type: string
-                  type: array
-                availabilityZoneMappingURL:
-                  description: URL for AZ to cluster mapping CSV.
+  - additionalPrinterColumns:
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    - jsonPath: .spec.credentials.secretRef.name
+      name: SECRET-NAME
+      priority: 1
+      type: string
+    name: v1beta1
+    schema:
+      openAPIV3Schema:
+        description: ProviderConfig configures a Nutanix provider.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ProviderConfigSpec defines the desired state of a ProviderConfig.
+            properties:
+              allowedLobs:
+                description: AllowedLoBs is the list of allowed Line of Business values
+                  for VMs.
+                items:
                   type: string
-                credentials:
-                  description: Provider credentials.
+                type: array
+              availabilityZoneMappingURL:
+                description: |-
+                  AvailabilityZoneMappingURL is the URL to fetch the availability zone to cluster mapping CSV.
+                  If specified and the feature is enabled, this will be used to map availabilityZone to clusterName in VM specs.
+                type: string
+              credentials:
+                description: Credentials required to authenticate to this provider.
+                properties:
+                  env:
+                    description: |-
+                      Env is a reference to an environment variable that contains credentials
+                      that must be used to connect to the provider.
+                    properties:
+                      name:
+                        description: Name is the name of an environment variable.
+                        type: string
+                    required:
+                    - name
+                    type: object
+                  fs:
+                    description: |-
+                      Fs is a reference to a filesystem location that contains credentials that
+                      must be used to connect to the provider.
+                    properties:
+                      path:
+                        description: Path is a filesystem path.
+                        type: string
+                    required:
+                    - path
+                    type: object
+                  secretRef:
+                    description: |-
+                      A SecretRef is a reference to a secret key that contains the credentials
+                      that must be used to connect to the provider.
+                    properties:
+                      key:
+                        description: The key to select.
+                        type: string
+                      name:
+                        description: Name of the secret.
+                        type: string
+                      namespace:
+                        description: Namespace of the secret.
+                        type: string
+                    required:
+                    - key
+                    - name
+                    - namespace
+                    type: object
+                  source:
+                    description: Source of the provider credentials.
+                    enum:
+                    - None
+                    - Secret
+                    - InjectedIdentity
+                    - Environment
+                    - Filesystem
+                    type: string
+                required:
+                - source
+                type: object
+              datacenterCredentials:
+                additionalProperties:
+                  description: ProviderCredentials required to authenticate.
                   properties:
                     env:
-                      description: Ref to env var with credentials.
+                      description: |-
+                        Env is a reference to an environment variable that contains credentials
+                        that must be used to connect to the provider.
                       properties:
                         name:
-                          description: Env var name.
+                          description: Name is the name of an environment variable.
                           type: string
                       required:
-                        - name
+                      - name
                       type: object
                     fs:
-                      description: Path to credentials file.
+                      description: |-
+                        Fs is a reference to a filesystem location that contains credentials that
+                        must be used to connect to the provider.
                       properties:
                         path:
-                          description: Filesystem path.
+                          description: Path is a filesystem path.
                           type: string
                       required:
-                        - path
+                      - path
                       type: object
                     secretRef:
-                      description: Secret with provider credentials.
+                      description: |-
+                        A SecretRef is a reference to a secret key that contains the credentials
+                        that must be used to connect to the provider.
                       properties:
                         key:
-                          description: Secret key.
+                          description: The key to select.
                           type: string
                         name:
-                          description: Secret name.
+                          description: Name of the secret.
                           type: string
                         namespace:
-                          description: Secret namespace.
+                          description: Namespace of the secret.
                           type: string
                       required:
-                        - key
-                        - name
-                        - namespace
+                      - key
+                      - name
+                      - namespace
                       type: object
                     source:
-                      description: Source type for credentials.
+                      description: Source of the provider credentials.
                       enum:
-                        - None
-                        - Secret
-                        - InjectedIdentity
-                        - Environment
-                        - Filesystem
+                      - None
+                      - Secret
+                      - InjectedIdentity
+                      - Environment
+                      - Filesystem
                       type: string
                   required:
-                    - source
+                  - source
                   type: object
-                datacenterCredentials:
-                  additionalProperties:
-                    description: Datacenter-specific credentials.
-                    properties:
-                      env:
-                        description: Env var reference.
-                        properties:
-                          name:
-                            description: Env var name.
-                            type: string
-                        required:
-                          - name
-                        type: object
-                      fs:
-                        description: Filesystem path reference.
-                        properties:
-                          path:
-                            description: Path.
-                            type: string
-                        required:
-                          - path
-                        type: object
-                      secretRef:
-                        description: Secret reference.
-                        properties:
-                          key:
-                            description: Secret key.
-                            type: string
-                          name:
-                            description: Secret name.
-                            type: string
-                          namespace:
-                            description: Secret namespace.
-                            type: string
-                        required:
-                          - key
-                          - name
-                          - namespace
-                        type: object
-                      source:
-                        description: Source type for credentials.
-                        enum:
-                          - None
-                          - Secret
-                          - InjectedIdentity
-                          - Environment
-                          - Filesystem
-                        type: string
-                    required:
-                      - source
-                    type: object
-                  description: Datacenter credentials mapping.
+                description: |-
+                  DatacenterCredentials maps datacenter names to their specific credentials.
+                  This allows using different credentials for different Prism Central instances.
+                type: object
+              enableAvailabilityZoneMapping:
+                description: |-
+                  EnableAvailabilityZoneMapping controls whether the provider should use the availability zone mapping feature.
+                  If true, the provider will use the mapping URL to map availabilityZone to clusterName. If false or omitted, the feature is disabled.
+                type: boolean
+              isLobMandatory:
+                description: IsLoBMandatory specifies whether the LoB field is mandatory
+                  for VMs.
+                type: boolean
+              prismCentralEndpoints:
+                additionalProperties:
+                  type: string
+                description: |-
+                  PrismCentralEndpoints maps datacenter names to their Prism Central endpoints.
+                  This allows dynamic selection of the Prism Central based on the datacenter specified in the VM spec.
+                type: object
+            required:
+            - credentials
+            type: object
+          status:
+            description: A ProviderConfigStatus defines the observed status of a ProviderConfig.
+            properties:
+              conditions:
+                description: Conditions of the resource.
+                items:
+                  description: A Condition that may apply to a resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        LastTransitionTime is the last time this condition transitioned from one
+                        status to another.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        A Message containing details about this condition's last transition from
+                        one status to another, if any.
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        ObservedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      type: integer
+                    reason:
+                      description: A Reason for this condition's last transition from
+                        one status to another.
+                      type: string
+                    status:
+                      description: Status of this condition; is it currently True,
+                        False, or Unknown?
+                      type: string
+                    type:
+                      description: |-
+                        Type of this condition. At most one of each condition type may apply to
+                        a resource at any point in time.
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - reason
+                  - status
+                  - type
                   type: object
-                enableAvailabilityZoneMapping:
-                  description: Enable AZ mapping.
-                  type: boolean
-                isLobMandatory:
-                  description: Whether LoB is mandatory.
-                  type: boolean
-                prismCentralEndpoints:
-                  additionalProperties:
-                    type: string
-                  description: Datacenter to Prism Central endpoints mapping.
-                  type: object
-              required:
-                - credentials
-              type: object
-            status:
-              description: Observed state of the provider config.
-              properties:
-                conditions:
-                  description: Resource conditions.
-                  items:
-                    description: Condition details.
-                    properties:
-                      lastTransitionTime:
-                        description: Last change time.
-                        format: date-time
-                        type: string
-                      message:
-                        description: Condition message.
-                        type: string
-                      observedGeneration:
-                        description: Generation observed.
-                        format: int64
-                        type: integer
-                      reason:
-                        description: Reason for last transition.
-                        type: string
-                      status:
-                        description: Current status (True, False, Unknown).
-                        type: string
-                      type:
-                        description: Condition type.
-                        type: string
-                    required:
-                      - lastTransitionTime
-                      - reason
-                      - status
-                      - type
-                    type: object
-                  type: array
-                  x-kubernetes-list-map-keys:
-                    - type
-                  x-kubernetes-list-type: map
-                users:
-                  description: Number of users using this config.
-                  format: int64
-                  type: integer
-              type: object
-          required:
-            - spec
-          type: object
-      served: true
-      storage: true
-      subresources: {}
+                type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
+              users:
+                description: Users of this provider configuration.
+                format: int64
+                type: integer
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources: {}
