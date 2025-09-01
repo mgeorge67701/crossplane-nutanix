@@ -51,11 +51,6 @@ bin/
 
 # Package build directory contents (but keep the directory structure)
 package/provider
-package/*.yaml
-!package/crossplane.yaml
-!package/README.md
-!package/icon.svg
-!package/examples/
 
 # Local environment files
 .env
