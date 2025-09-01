@@ -152,12 +152,19 @@ jobs:
         VERSION=${GITHUB_REF_NAME:-$(git rev-parse --short HEAD)}
         echo "Building package version: $VERSION"
         
-        # Convert any tabs to spaces in YAML files to avoid parsing errors
-        find package/ -name "*.yaml" -exec sed -i 's/\t/  /g' {} \;
-        echo "Converted tabs to spaces in YAML files"
+        # Create manifest.json manually for Upbound compatibility
+        cat > package/manifest.json << 'EOF'
+        {
+          "apiVersion": "meta.pkg.crossplane.io/v1",
+          "kind": "Provider",
+          "metadata": {
+            "name": "provider-nutanix"
+          }
+        }
+        EOF
         
-        # Use Crossplane CLI to create package with proper manifest.json
-        crank xpkg build --package-root=package --package-file=provider-nutanix-${VERSION}.xpkg
+        # Use manual tar creation with manifest.json included
+        tar -cf provider-nutanix-${VERSION}.xpkg -C package .
         echo "Package created successfully"
         ls -la provider-nutanix-${VERSION}.xpkg
         file provider-nutanix-${VERSION}.xpkg
@@ -217,12 +224,19 @@ jobs:
         VERSION=${GITHUB_REF_NAME#v}
         echo "Building package version: $VERSION"
         
-        # Convert any tabs to spaces in YAML files to avoid parsing errors
-        find package/ -name "*.yaml" -exec sed -i 's/\t/  /g' {} \;
-        echo "Converted tabs to spaces in YAML files"
+        # Create manifest.json manually for Upbound compatibility
+        cat > package/manifest.json << 'EOF'
+        {
+          "apiVersion": "meta.pkg.crossplane.io/v1",
+          "kind": "Provider",
+          "metadata": {
+            "name": "provider-nutanix"
+          }
+        }
+        EOF
         
-        # Use Crossplane CLI to create package with proper manifest.json
-        crank xpkg build --package-root=package --package-file=provider-nutanix-${VERSION}.xpkg
+        # Use manual tar creation with manifest.json included
+        tar -cf provider-nutanix-${VERSION}.xpkg -C package .
         echo "Package created successfully"
         ls -la provider-nutanix-${VERSION}.xpkg
         file provider-nutanix-${VERSION}.xpkg
@@ -306,12 +320,19 @@ jobs:
         echo "Package will be built as: provider-nutanix-${VERSION}.xpkg"
         sed -i "s|image:.*|image: ghcr.io/mgeorge67701/provider-nutanix:${VERSION}|" package/crossplane.yaml
         
-        # Convert any tabs to spaces in YAML files to avoid parsing errors
-        find package/ -name "*.yaml" -exec sed -i 's/\t/  /g' {} \;
-        echo "Converted tabs to spaces in YAML files"
+        # Create manifest.json manually for Upbound compatibility
+        cat > package/manifest.json << 'EOF'
+        {
+          "apiVersion": "meta.pkg.crossplane.io/v1",
+          "kind": "Provider",
+          "metadata": {
+            "name": "provider-nutanix"
+          }
+        }
+        EOF
         
-        # Use Crossplane CLI to create package with proper manifest.json
-        crank xpkg build --package-root=package --package-file=provider-nutanix-${VERSION}.xpkg
+        # Use manual tar creation with manifest.json included
+        tar -cf provider-nutanix-${VERSION}.xpkg -C package .
         echo "Package created successfully"
         ls -la provider-nutanix-${VERSION}.xpkg
         file provider-nutanix-${VERSION}.xpkg
