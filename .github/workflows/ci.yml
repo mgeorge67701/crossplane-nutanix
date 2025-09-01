@@ -186,6 +186,12 @@ jobs:
         echo "--- Content of package/nutanix.crossplane.io_providerconfigs.yaml ---"
         cat package/nutanix.crossplane.io_providerconfigs.yaml
         echo "--- End of content ---"
+        echo "--- Debugging line 77 specifically ---"
+        echo "Lines 75-80:"
+        sed -n '75,80p' package/nutanix.crossplane.io_providerconfigs.yaml | nl -v 75
+        echo "Hexdump of lines 75-80:"
+        sed -n '75,80p' package/nutanix.crossplane.io_providerconfigs.yaml | hexdump -C
+        echo "--- End line 77 debug ---"
         echo "--- Hexdump of package/nutanix.crossplane.io_providerconfigs.yaml ---"
         hexdump -C package/nutanix.crossplane.io_providerconfigs.yaml
         echo "--- End of hexdump ---"
