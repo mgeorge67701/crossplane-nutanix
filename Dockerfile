@@ -1,5 +1,5 @@
-# Multi-stage build for multi-architecture support
-FROM --platform=$BUILDPLATFORM golang:1.24-alpine AS builder
+# Multi-stage build for multi-architecture support  
+FROM --platform=$BUILDPLATFORM golang:1.23-alpine AS builder
 
 ARG TARGETOS
 ARG TARGETARCH
