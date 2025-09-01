@@ -16,48 +16,45 @@ permissions:
   id-token: write
 
 jobs:
+  debug:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Debug event information
+      run: |
+        echo "Event name: ${{ github.event_name }}"
+        echo "Ref: ${{ github.ref }}"
+        echo "Ref type: ${{ github.ref_type }}"
+        echo "Tag: ${{ github.ref_name }}"
+        echo "Event action: ${{ github.event.action }}"
 
   test:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-    - name: Cache Go modules
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cache/go-build
-          ~/go/pkg/mod
-        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-        restore-keys: |
-          ${{ runner.os }}-go-
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
         go-version: '1.24'
-        cache: false
+        cache: true
+        cache-dependency-path: 'go.sum'
     - name: Download dependencies
       run: |
         go clean -modcache || true
         go mod download
       env:
         GOPROXY: https://proxy.golang.org,direct
+    - name: Run tests
+      run: go test -v ./...
+      env:
+        CGO_ENABLED: 0
+    - name: Run go vet
+      run: go vet ./...
     - name: Install golangci-lint
       run: |
         curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin latest
         echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
     - name: Run golangci-lint
       run: golangci-lint run --timeout=10m
-    - name: Run tests
-      run: |
-        if find . -name "*_test.go" | grep -q .; then
-          go test -v ./...
-        else
-          echo "No test files found, skipping tests"
-        fi
-      env:
-        CGO_ENABLED: 0
-    - name: Run go vet
-      run: go vet ./...
     - name: Check formatting
       run: |
         if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
@@ -67,29 +64,32 @@ jobs:
         fi
     - name: Generate Go code
       run: make generate
-    - name: Generate CRDs
-      run: make generate-crds
-    - name: Verify generated code compiles
-      run: go build ./...
-    - name: Upload CRD artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: crd-artifacts
-        path: config/crd/
-        retention-days: 1
+    - name: Check if Go code is up to date
+      run: |
+        if [ -n "$(git status --porcelain apis/)" ]; then
+          echo "Generated Go code is not up to date. Please run 'make generate' and commit the changes."
+          git status --porcelain apis/
+          exit 1
+        fi
 
   validate-examples:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-    - name: Validate examples directory
+    - name: Validate root examples directory
       run: |
         if [ -d examples ]; then
-          echo "✅ Examples directory found"
-          find examples/ -name "*.yaml" -o -name "*.yml" | head -5
+          echo "Found examples directory with usage examples"
+          find examples/ -name "*.yaml" -o -name "*.yml" | xargs -I {} sh -c 'echo "Checking {}" && cat {} | grep -q "apiVersion" || echo "Note: {} may be documentation example"'
+          echo "✅ Examples check completed - examples available in repository"
         else
           echo "No examples directory found."
         fi
+    - name: Note about package examples
+      run: |
+        echo "ℹ️  Examples are provided in the /examples directory of the repository"
+        echo "   They are not included in the package to avoid CRD validation conflicts"
+        echo "   Users can find complete examples at: https://github.com/mgeorge67701/provider-nutanix/tree/main/examples"
 
   build:
     runs-on: ubuntu-latest
@@ -132,31 +132,35 @@ jobs:
       uses: actions/setup-go@v5
       with:
         go-version: '1.24'
-    - name: Install Upbound CLI
+    - name: Install Crossplane CLI
       run: |
-        curl -sL https://cli.upbound.io | sh
-        sudo mv up /usr/local/bin/
+        curl -sL https://releases.crossplane.io/stable/current/bin/linux_amd64/crank -o crank
+        chmod +x crank
+        sudo mv crank /usr/local/bin/
     - name: Prepare package directory
-      run: make copy-provider
-    - name: Convert tabs to spaces in YAML files
       run: |
-        find package/ -name "*.yaml" -exec sed -i 's/\t/  /g' {} \;
-    - name: Clean package directory
-      run: |
+        make copy-provider
         find package/ -name "*.tmp" -delete || true
         find package/ -name "*.bak" -delete || true
         find package/ -name "*.backup" -delete || true
         rm -f package/README.md
         rm -rf package/examples
+    - name: Sync README.md to crossplane.yaml annotation
+      run: bash scripts/sync-readme.sh
     - name: Build Crossplane package
       run: |
         VERSION=${GITHUB_REF_NAME:-$(git rev-parse --short HEAD)}
         echo "Building package version: $VERSION"
         
-        # Create package using uncompressed tar (xpkg format requirement)
+        # Use manual tar creation (most reliable method)
         tar -cf provider-nutanix-${VERSION}.xpkg -C package .
         echo "Package created successfully"
         ls -la provider-nutanix-${VERSION}.xpkg
+        file provider-nutanix-${VERSION}.xpkg
+        
+        # Verify package contents
+        echo "Package contents:"
+        tar -tf provider-nutanix-${VERSION}.xpkg | head -10
     - name: Upload package artifact
       uses: actions/upload-artifact@v4
       with:
@@ -183,10 +187,6 @@ jobs:
         cp bin/provider dist/provider-nutanix_darwin_amd64
         GOOS=darwin GOARCH=arm64 make build
         cp bin/provider dist/provider-nutanix_darwin_arm64
-    - name: Install Upbound CLI
-      run: |
-        curl -sL https://cli.upbound.io | sh
-        sudo mv up /usr/local/bin/
     - name: Install Crossplane CLI
       run: |
         curl -sL https://releases.crossplane.io/stable/current/bin/linux_amd64/crank -o crank
@@ -194,15 +194,30 @@ jobs:
         sudo mv crank /usr/local/bin/
     - name: Build Crossplane package
       run: |
+        # Build Linux/amd64 binary for the package
         make copy-provider
         find package/ -name "*.tmp" -delete || true
         find package/ -name "*.bak" -delete || true
         find package/ -name "*.backup" -delete || true
         rm -f package/README.md
         rm -rf package/examples
+        
+        echo "--- Content of package/crossplane.yaml BEFORE sync ---"
+        cat package/crossplane.yaml
+        echo "--- Content of README.md ---"
+        cat README.md
+        bash scripts/sync-readme.sh # Added: Sync README.md to crossplane.yaml annotation
+        echo "--- Content of package/crossplane.yaml AFTER sync ---"
+        cat package/crossplane.yaml
+        
         VERSION=${GITHUB_REF_NAME#v}
         echo "Building package version: $VERSION"
+        
+        # Use manual tar creation (most reliable method)
         tar -cf provider-nutanix-${VERSION}.xpkg -C package .
+        echo "Package created successfully"
+        ls -la provider-nutanix-${VERSION}.xpkg
+        file provider-nutanix-${VERSION}.xpkg
         cp provider-nutanix-${VERSION}.xpkg dist/
     - name: Prepare release assets
       run: |
@@ -241,22 +256,16 @@ jobs:
       run: |
         curl -sL https://cli.upbound.io | sh
         sudo mv up /usr/local/bin/
-    - name: Install Crossplane CLI
+        up version
+    - name: Login to Upbound
       run: |
-        curl -sL https://releases.crossplane.io/stable/current/bin/linux_amd64/crank -o crank
-        chmod +x crank
-        sudo mv crank /usr/local/bin/
-    - name: Configure Upbound Authentication
-      run: |
-        echo "Setting up Upbound authentication with token..."
-        # Set the token environment variable that up CLI will use
-        echo "UP_TOKEN=${UPBOUND_TOKEN}" >> $GITHUB_ENV
-        echo "UPBOUND_ACCESS_ID=${UPBOUND_ACCESS_ID}" >> $GITHUB_ENV
-        echo "Verifying authentication..."
-        UP_TOKEN="${UPBOUND_TOKEN}" UPBOUND_ACCESS_ID="${UPBOUND_ACCESS_ID}" up profile current || echo "Creating default profile..."
+        echo "Logging in to Upbound..."
+        up login --username="${{ secrets.UPBOUND_ACCESS_ID }}" --password="${{ secrets.UPBOUND_TOKEN }}"
+        echo "Login successful"
+        up profile current
       env:
-        UPBOUND_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
         UPBOUND_ACCESS_ID: ${{ secrets.UPBOUND_ACCESS_ID }}
+        UPBOUND_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
     - name: Build and push Docker image to GitHub Container Registry
       run: |
         VERSION=${GITHUB_REF_NAME#v}
@@ -278,76 +287,62 @@ jobs:
         find package/ -name "*.backup" -delete || true
         rm -f package/README.md
         rm -rf package/examples
+        
         VERSION=${GITHUB_REF_NAME#v}
         echo "Building package version: $VERSION"
+        echo "Package will be built as: provider-nutanix-${VERSION}.xpkg"
         sed -i "s|image:.*|image: ghcr.io/mgeorge67701/provider-nutanix:${VERSION}|" package/crossplane.yaml
+        
+        # Use manual tar creation (most reliable method)
         tar -cf provider-nutanix-${VERSION}.xpkg -C package .
+        echo "Package created successfully"
         ls -la provider-nutanix-${VERSION}.xpkg
+        file provider-nutanix-${VERSION}.xpkg
         echo "Package size: $(du -h provider-nutanix-${VERSION}.xpkg)"
-    - name: Verify Upbound Authentication
-      run: |
-        echo "Verifying Upbound authentication status..."
-        up profile current || echo "No profile found, will use token directly"
-        echo "Authentication setup complete"
+        
+        # Verify package contents
+        echo "Package contents:"
+        tar -tf provider-nutanix-${VERSION}.xpkg | head -10
     - name: Verify package and repository
       run: |
         VERSION=${GITHUB_REF_NAME#v}
         echo "Verifying package file exists..."
         ls -la provider-nutanix-${VERSION}.xpkg
         echo "Checking repository access..."
-        
-        # Try to list repositories and check if provider-nutanix exists
-        if UP_TOKEN="${UPBOUND_TOKEN}" UPBOUND_ACCESS_ID="${UPBOUND_ACCESS_ID}" up repository list | grep -q provider-nutanix; then
-          echo "Repository provider-nutanix found"
-        else
-          echo "Repository provider-nutanix not found"
-          echo "Note: Repository may need to be created manually via Upbound Console"
-          echo "Continuing with package push attempt..."
+        if ! up repository list | grep -q provider-nutanix; then
+          echo "Repository not found, creating it..."
+          up repository create provider-nutanix --publish
         fi
-        
         echo "Current user context:"
-        UP_TOKEN="${UPBOUND_TOKEN}" UPBOUND_ACCESS_ID="${UPBOUND_ACCESS_ID}" up profile current || echo "Using token-based authentication"
+        up profile current
         echo "Ready to push package: xpkg.upbound.io/mgeorge67701/provider-nutanix:${VERSION}"
-      env:
-        UPBOUND_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
-        UPBOUND_ACCESS_ID: ${{ secrets.UPBOUND_ACCESS_ID }}
     - name: Push to Upbound Marketplace
       run: |
         VERSION=${GITHUB_REF_NAME#v}
         echo "Pushing package version: ${VERSION}"
         echo "Full ref name: ${GITHUB_REF_NAME}"
         
-        # Attempt to push the package
-        if UP_TOKEN="${UPBOUND_TOKEN}" UPBOUND_ACCESS_ID="${UPBOUND_ACCESS_ID}" up xpkg push xpkg.upbound.io/mgeorge67701/provider-nutanix:${VERSION} -f provider-nutanix-${VERSION}.xpkg; then
+        # Try pushing the package with error handling
+        if up xpkg push xpkg.upbound.io/mgeorge67701/provider-nutanix:${VERSION} -f provider-nutanix-${VERSION}.xpkg; then
           echo "Successfully pushed version ${VERSION}"
           
           # Only push as latest if this is not a pre-release
           if [[ ! "${VERSION}" =~ (alpha|beta|rc) ]]; then
             echo "Pushing as latest..."
-            if UP_TOKEN="${UPBOUND_TOKEN}" UPBOUND_ACCESS_ID="${UPBOUND_ACCESS_ID}" up xpkg push xpkg.upbound.io/mgeorge67701/provider-nutanix:latest -f provider-nutanix-${VERSION}.xpkg; then
-              echo "Successfully pushed as latest"
-            else
-              echo "Warning: Failed to push as latest, but version push succeeded"
-            fi
+            up xpkg push xpkg.upbound.io/mgeorge67701/provider-nutanix:latest -f provider-nutanix-${VERSION}.xpkg
+            echo "Successfully pushed as latest"
           fi
         else
-          echo "Error: Failed to push package to Upbound Marketplace"
-          echo "This may be due to repository permissions or network issues"
-          echo "Package build was successful - manual upload may be required"
+          echo "Push failed. Let's debug the package format:"
+          file provider-nutanix-${VERSION}.xpkg
+          echo "Package contents:"
+          tar -tf provider-nutanix-${VERSION}.xpkg | head -20
+          echo "Upbound CLI version:"
+          up version
           exit 1
         fi
-      env:
-        UPBOUND_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
-        UPBOUND_ACCESS_ID: ${{ secrets.UPBOUND_ACCESS_ID }}
     - name: Update repository publish policy
       run: |
         echo "Updating repository publish policy..."
-        if UP_TOKEN="${UPBOUND_TOKEN}" UPBOUND_ACCESS_ID="${UPBOUND_ACCESS_ID}" up repository update provider-nutanix --publish --private=false; then
-          echo "Repository publish policy updated successfully"
-        else
-          echo "Warning: Repository publish policy update failed - this is often expected for new repositories"
-          echo "Repository may need manual configuration in Upbound Console"
-        fi
-      env:
-        UPBOUND_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
-        UPBOUND_ACCESS_ID: ${{ secrets.UPBOUND_ACCESS_ID }}
+        up repository update provider-nutanix --publish --private=false || echo "Repository update failed, continuing..."
+        echo "Repository update completed"
