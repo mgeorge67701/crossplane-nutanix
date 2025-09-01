@@ -321,25 +321,12 @@ jobs:
         VERSION=${GITHUB_REF_NAME#v}
         echo "Pushing package version: ${VERSION}"
         echo "Full ref name: ${GITHUB_REF_NAME}"
-        
-        # Try pushing the package with error handling
-        if up xpkg push xpkg.upbound.io/mgeorge67701/provider-nutanix:${VERSION} -f provider-nutanix-${VERSION}.xpkg; then
-          echo "Successfully pushed version ${VERSION}"
-          
-          # Only push as latest if this is not a pre-release
-          if [[ ! "${VERSION}" =~ (alpha|beta|rc) ]]; then
-            echo "Pushing as latest..."
-            up xpkg push xpkg.upbound.io/mgeorge67701/provider-nutanix:latest -f provider-nutanix-${VERSION}.xpkg
-            echo "Successfully pushed as latest"
-          fi
-        else
-          echo "Push failed. Let's debug the package format:"
-          file provider-nutanix-${VERSION}.xpkg
-          echo "Package contents:"
-          tar -tf provider-nutanix-${VERSION}.xpkg | head -20
-          echo "Upbound CLI version:"
-          up version
-          exit 1
+        up xpkg push xpkg.upbound.io/mgeorge67701/provider-nutanix:${VERSION} -f provider-nutanix-${VERSION}.xpkg
+        echo "Successfully pushed version ${VERSION}"
+        if [[ ! "${VERSION}" =~ (alpha|beta|rc) ]]; then
+          echo "Pushing as latest..."
+          up xpkg push xpkg.upbound.io/mgeorge67701/provider-nutanix:latest -f provider-nutanix-${VERSION}.xpkg
+          echo "Successfully pushed as latest"
         fi
     - name: Update repository publish policy
       run: |
