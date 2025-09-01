@@ -46,16 +46,33 @@ copy-provider: package-dir
 	cp bin/provider package/
 	cp config/crd/nutanix.crossplane.io_*.yaml package/
 
+# Version management
+version-patch:
+	@bash scripts/version.sh patch
+
+version-minor:
+	@bash scripts/version.sh minor
+
+version-major:
+	@bash scripts/version.sh major
+
+version-dry-run:
+	@bash scripts/version.sh patch --dry-run
+
 # Help
 help:
 	@echo "Available targets:"
-	@echo "  generate      - Generate deepcopy methods"
-	@echo "  generate-crds - Generate CRD YAML files"
-	@echo "  build         - Build for current platform (default: linux/amd64)"
-	@echo "  build-macbook - Build for MacBook (Apple Silicon)"
-	@echo "  build-linux   - Build for Linux (x86_64)"
-	@echo "  build-pi5     - Build for Raspberry Pi 5 (ARM64)"
-	@echo "  build-all     - Build for all platforms"
-	@echo "  copy-provider - Copy provider binary to package directory"
+	@echo "  generate          - Generate deepcopy methods"
+	@echo "  generate-crds     - Generate CRD YAML files"
+	@echo "  build             - Build for current platform (default: linux/amd64)"
+	@echo "  build-macbook     - Build for MacBook (Apple Silicon)"
+	@echo "  build-linux       - Build for Linux (x86_64)"
+	@echo "  build-pi5         - Build for Raspberry Pi 5 (ARM64)"
+	@echo "  build-all         - Build for all platforms"
+	@echo "  copy-provider     - Copy provider binary to package directory"
+	@echo "  version-patch     - Create and push a new patch version tag"
+	@echo "  version-minor     - Create and push a new minor version tag"
+	@echo "  version-major     - Create and push a new major version tag"
+	@echo "  version-dry-run   - Show what the next version would be (no changes)"
 
-.PHONY: generate generate-crds build build-macbook build-linux build-pi5 build-all package-dir copy-provider help
+.PHONY: generate generate-crds build build-macbook build-linux build-pi5 build-all package-dir copy-provider version-patch version-minor version-major version-dry-run help
