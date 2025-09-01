@@ -153,8 +153,8 @@ jobs:
         VERSION=${GITHUB_REF_NAME:-$(git rev-parse --short HEAD)}
         echo "Building package version: $VERSION"
         
-        # Create package using tar method (proven to work)
-        tar -czf provider-nutanix-${VERSION}.xpkg -C package .
+        # Create package using uncompressed tar (xpkg format requirement)
+        tar -cf provider-nutanix-${VERSION}.xpkg -C package .
         echo "Package created successfully"
         ls -la provider-nutanix-${VERSION}.xpkg
     - name: Upload package artifact
@@ -202,7 +202,7 @@ jobs:
         rm -rf package/examples
         VERSION=${GITHUB_REF_NAME#v}
         echo "Building package version: $VERSION"
-        tar -czf provider-nutanix-${VERSION}.xpkg -C package .
+        tar -cf provider-nutanix-${VERSION}.xpkg -C package .
         cp provider-nutanix-${VERSION}.xpkg dist/
     - name: Prepare release assets
       run: |
@@ -281,7 +281,7 @@ jobs:
         VERSION=${GITHUB_REF_NAME#v}
         echo "Building package version: $VERSION"
         sed -i "s|image:.*|image: ghcr.io/mgeorge67701/provider-nutanix:${VERSION}|" package/crossplane.yaml
-        tar -czf provider-nutanix-${VERSION}.xpkg -C package .
+        tar -cf provider-nutanix-${VERSION}.xpkg -C package .
         ls -la provider-nutanix-${VERSION}.xpkg
         echo "Package size: $(du -h provider-nutanix-${VERSION}.xpkg)"
     - name: Verify Upbound Authentication
