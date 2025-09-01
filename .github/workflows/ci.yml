@@ -152,13 +152,17 @@ jobs:
         VERSION=${GITHUB_REF_NAME:-$(git rev-parse --short HEAD)}
         echo "Building package version: $VERSION"
         
-        # Use manual tar creation (most reliable method)
-        tar -cf provider-nutanix-${VERSION}.xpkg -C package .
+        # Convert any tabs to spaces in YAML files to avoid parsing errors
+        find package/ -name "*.yaml" -exec sed -i 's/\t/  /g' {} \;
+        echo "Converted tabs to spaces in YAML files"
+        
+        # Use Crossplane CLI to create package with proper manifest.json
+        crank xpkg build --package-root=package --output=provider-nutanix-${VERSION}.xpkg
         echo "Package created successfully"
         ls -la provider-nutanix-${VERSION}.xpkg
         file provider-nutanix-${VERSION}.xpkg
         
-        # Verify package contents
+        # Verify package contents (should include manifest.json)
         echo "Package contents:"
         tar -tf provider-nutanix-${VERSION}.xpkg | head -10
     - name: Upload package artifact
@@ -213,8 +217,12 @@ jobs:
         VERSION=${GITHUB_REF_NAME#v}
         echo "Building package version: $VERSION"
         
-        # Use manual tar creation (most reliable method)
-        tar -cf provider-nutanix-${VERSION}.xpkg -C package .
+        # Convert any tabs to spaces in YAML files to avoid parsing errors
+        find package/ -name "*.yaml" -exec sed -i 's/\t/  /g' {} \;
+        echo "Converted tabs to spaces in YAML files"
+        
+        # Use Crossplane CLI to create package with proper manifest.json
+        crank xpkg build --package-root=package --output=provider-nutanix-${VERSION}.xpkg
         echo "Package created successfully"
         ls -la provider-nutanix-${VERSION}.xpkg
         file provider-nutanix-${VERSION}.xpkg
@@ -257,6 +265,11 @@ jobs:
         curl -sL https://cli.upbound.io | sh
         sudo mv up /usr/local/bin/
         up version
+    - name: Install Crossplane CLI
+      run: |
+        curl -sL https://releases.crossplane.io/stable/current/bin/linux_amd64/crank -o crank
+        chmod +x crank
+        sudo mv crank /usr/local/bin/
     - name: Login to Upbound
       run: |
         echo "Logging in to Upbound..."
@@ -293,14 +306,18 @@ jobs:
         echo "Package will be built as: provider-nutanix-${VERSION}.xpkg"
         sed -i "s|image:.*|image: ghcr.io/mgeorge67701/provider-nutanix:${VERSION}|" package/crossplane.yaml
         
-        # Use manual tar creation (most reliable method)
-        tar -cf provider-nutanix-${VERSION}.xpkg -C package .
+        # Convert any tabs to spaces in YAML files to avoid parsing errors
+        find package/ -name "*.yaml" -exec sed -i 's/\t/  /g' {} \;
+        echo "Converted tabs to spaces in YAML files"
+        
+        # Use Crossplane CLI to create package with proper manifest.json
+        crank xpkg build --package-root=package --output=provider-nutanix-${VERSION}.xpkg
         echo "Package created successfully"
         ls -la provider-nutanix-${VERSION}.xpkg
         file provider-nutanix-${VERSION}.xpkg
         echo "Package size: $(du -h provider-nutanix-${VERSION}.xpkg)"
         
-        # Verify package contents
+        # Verify package contents (should include manifest.json)
         echo "Package contents:"
         tar -tf provider-nutanix-${VERSION}.xpkg | head -10
     - name: Verify package and repository
@@ -321,12 +338,25 @@ jobs:
         VERSION=${GITHUB_REF_NAME#v}
         echo "Pushing package version: ${VERSION}"
         echo "Full ref name: ${GITHUB_REF_NAME}"
-        up xpkg push xpkg.upbound.io/mgeorge67701/provider-nutanix:${VERSION} -f provider-nutanix-${VERSION}.xpkg
-        echo "Successfully pushed version ${VERSION}"
-        if [[ ! "${VERSION}" =~ (alpha|beta|rc) ]]; then
-          echo "Pushing as latest..."
-          up xpkg push xpkg.upbound.io/mgeorge67701/provider-nutanix:latest -f provider-nutanix-${VERSION}.xpkg
-          echo "Successfully pushed as latest"
+        
+        # Try pushing the package with error handling
+        if up xpkg push xpkg.upbound.io/mgeorge67701/provider-nutanix:${VERSION} -f provider-nutanix-${VERSION}.xpkg; then
+          echo "Successfully pushed version ${VERSION}"
+          
+          # Only push as latest if this is not a pre-release
+          if [[ ! "${VERSION}" =~ (alpha|beta|rc) ]]; then
+            echo "Pushing as latest..."
+            up xpkg push xpkg.upbound.io/mgeorge67701/provider-nutanix:latest -f provider-nutanix-${VERSION}.xpkg
+            echo "Successfully pushed as latest"
+          fi
+        else
+          echo "Push failed. Let's debug the package format:"
+          file provider-nutanix-${VERSION}.xpkg
+          echo "Package contents:"
+          tar -tf provider-nutanix-${VERSION}.xpkg | head -20
+          echo "Upbound CLI version:"
+          up version
+          exit 1
         fi
     - name: Update repository publish policy
       run: |
