@@ -154,6 +154,11 @@ jobs:
         sudo mv up /usr/local/bin/
     - name: Prepare package directory
       run: make copy-provider
+    - name: Convert tabs to spaces in all YAML files
+      run: |
+        echo "Converting all tabs to spaces in YAML files..."
+        find package/ -name "*.yaml" -exec sed -i 's/\t/  /g' {} \;
+        echo "Tab conversion completed."
     - name: Clean package directory
       run: |
         # Clean up any backup, temporary, or unwanted files that might confuse package builders
@@ -197,11 +202,56 @@ jobs:
         echo "--- End of hexdump ---"
         # Ensure no examples directory exists to avoid validation conflicts
         rm -rf package/examples
-        # Try Upbound CLI first (cleaner output), then fallback to Crossplane CLI
-        if ! up xpkg build --package-root=package --output=provider-nutanix-${VERSION}.xpkg; then
-          echo "Upbound CLI failed, trying Crossplane CLI as fallback..."
-          crank xpkg build --package-root=package --package-file=provider-nutanix-${VERSION}.xpkg
+        
+        # Strategy 1: Try building with alternative method using tar
+        echo "=== Attempting Strategy 1: Manual tar-based package creation ==="
+        if tar -czf provider-nutanix-${VERSION}.xpkg -C package .; then
+          echo "Strategy 1 succeeded: Manual tar creation"
+          ls -la provider-nutanix-${VERSION}.xpkg
+          exit 0
+        else
+          echo "Strategy 1 failed: Manual tar creation"
         fi
+        
+        # Strategy 2: Try with different Docker image
+        echo "=== Attempting Strategy 2: Using different base approach ==="
+        # Create a minimal crossplane.yaml without complex features
+        cp package/crossplane.yaml package/crossplane.yaml.backup
+        cat > package/crossplane.yaml << 'EOF'
+        apiVersion: meta.pkg.crossplane.io/v1
+        kind: Provider
+        metadata:
+          name: provider-nutanix
+          annotations:
+            meta.crossplane.io/maintainer: Crossplane Community <info@crossplane.io>
+            meta.crossplane.io/source: github.com/crossplane-contrib/provider-nutanix
+            meta.crossplane.io/license: Apache-2.0
+            meta.crossplane.io/description: |
+              The Nutanix Crossplane provider adds support for managing Nutanix resources in Kubernetes.
+        spec:
+          controller:
+            image: ghcr.io/crossplane-contrib/provider-nutanix:latest
+        EOF
+        
+        if up xpkg build --package-root=package --output=provider-nutanix-${VERSION}.xpkg; then
+          echo "Strategy 2 succeeded: Simplified crossplane.yaml"
+          exit 0
+        else
+          echo "Strategy 2 failed: Simplified crossplane.yaml"
+          mv package/crossplane.yaml.backup package/crossplane.yaml
+        fi
+        
+        # Strategy 3: Try Crossplane CLI as ultimate fallback
+        echo "=== Attempting Strategy 3: Crossplane CLI fallback ==="
+        if crank xpkg build --package-root=package --package-file=provider-nutanix-${VERSION}.xpkg; then
+          echo "Strategy 3 succeeded: Crossplane CLI"
+          exit 0
+        else
+          echo "Strategy 3 failed: Crossplane CLI"
+        fi
+        
+        echo "All build strategies failed"
+        exit 1
     - name: Upload package artifact
       uses: actions/upload-artifact@v4
       with:

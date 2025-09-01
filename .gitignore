@@ -60,3 +60,4 @@ package/*.yaml
 # Local environment files
 .env
 .env.local
+up
