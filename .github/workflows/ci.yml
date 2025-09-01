@@ -251,11 +251,12 @@ jobs:
         echo "Setting up Upbound authentication with token..."
         # Set the token environment variable that up CLI will use
         echo "UP_TOKEN=${UPBOUND_TOKEN}" >> $GITHUB_ENV
+        echo "UPBOUND_ACCESS_ID=${UPBOUND_ACCESS_ID}" >> $GITHUB_ENV
         echo "Verifying authentication..."
-        # Test authentication by checking profile
-        UP_TOKEN="${UPBOUND_TOKEN}" up profile current || echo "Creating default profile..."
+        UP_TOKEN="${UPBOUND_TOKEN}" UPBOUND_ACCESS_ID="${UPBOUND_ACCESS_ID}" up profile current || echo "Creating default profile..."
       env:
         UPBOUND_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
+        UPBOUND_ACCESS_ID: ${{ secrets.UPBOUND_ACCESS_ID }}
     - name: Build and push Docker image to GitHub Container Registry
       run: |
         VERSION=${GITHUB_REF_NAME#v}
@@ -296,7 +297,7 @@ jobs:
         echo "Checking repository access..."
         
         # Try to list repositories and check if provider-nutanix exists
-        if UP_TOKEN="${UPBOUND_TOKEN}" up repository list | grep -q provider-nutanix; then
+        if UP_TOKEN="${UPBOUND_TOKEN}" UPBOUND_ACCESS_ID="${UPBOUND_ACCESS_ID}" up repository list | grep -q provider-nutanix; then
           echo "Repository provider-nutanix found"
         else
           echo "Repository provider-nutanix not found"
@@ -305,10 +306,11 @@ jobs:
         fi
         
         echo "Current user context:"
-        UP_TOKEN="${UPBOUND_TOKEN}" up profile current || echo "Using token-based authentication"
+        UP_TOKEN="${UPBOUND_TOKEN}" UPBOUND_ACCESS_ID="${UPBOUND_ACCESS_ID}" up profile current || echo "Using token-based authentication"
         echo "Ready to push package: xpkg.upbound.io/mgeorge67701/provider-nutanix:${VERSION}"
       env:
         UPBOUND_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
+        UPBOUND_ACCESS_ID: ${{ secrets.UPBOUND_ACCESS_ID }}
     - name: Push to Upbound Marketplace
       run: |
         VERSION=${GITHUB_REF_NAME#v}
@@ -316,13 +318,13 @@ jobs:
         echo "Full ref name: ${GITHUB_REF_NAME}"
         
         # Attempt to push the package
-        if UP_TOKEN="${UPBOUND_TOKEN}" up xpkg push xpkg.upbound.io/mgeorge67701/provider-nutanix:${VERSION} -f provider-nutanix-${VERSION}.xpkg; then
+        if UP_TOKEN="${UPBOUND_TOKEN}" UPBOUND_ACCESS_ID="${UPBOUND_ACCESS_ID}" up xpkg push xpkg.upbound.io/mgeorge67701/provider-nutanix:${VERSION} -f provider-nutanix-${VERSION}.xpkg; then
           echo "Successfully pushed version ${VERSION}"
           
           # Only push as latest if this is not a pre-release
           if [[ ! "${VERSION}" =~ (alpha|beta|rc) ]]; then
             echo "Pushing as latest..."
-            if UP_TOKEN="${UPBOUND_TOKEN}" up xpkg push xpkg.upbound.io/mgeorge67701/provider-nutanix:latest -f provider-nutanix-${VERSION}.xpkg; then
+            if UP_TOKEN="${UPBOUND_TOKEN}" UPBOUND_ACCESS_ID="${UPBOUND_ACCESS_ID}" up xpkg push xpkg.upbound.io/mgeorge67701/provider-nutanix:latest -f provider-nutanix-${VERSION}.xpkg; then
               echo "Successfully pushed as latest"
             else
               echo "Warning: Failed to push as latest, but version push succeeded"
@@ -336,10 +338,11 @@ jobs:
         fi
       env:
         UPBOUND_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
+        UPBOUND_ACCESS_ID: ${{ secrets.UPBOUND_ACCESS_ID }}
     - name: Update repository publish policy
       run: |
         echo "Updating repository publish policy..."
-        if UP_TOKEN="${UPBOUND_TOKEN}" up repository update provider-nutanix --publish --private=false; then
+        if UP_TOKEN="${UPBOUND_TOKEN}" UPBOUND_ACCESS_ID="${UPBOUND_ACCESS_ID}" up repository update provider-nutanix --publish --private=false; then
           echo "Repository publish policy updated successfully"
         else
           echo "Warning: Repository publish policy update failed - this is often expected for new repositories"
@@ -347,3 +350,4 @@ jobs:
         fi
       env:
         UPBOUND_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
+        UPBOUND_ACCESS_ID: ${{ secrets.UPBOUND_ACCESS_ID }}
