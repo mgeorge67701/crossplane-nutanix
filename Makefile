@@ -43,7 +43,6 @@ package-dir:
 
 copy-provider: package-dir
 	$(MAKE) build GOOS=linux GOARCH=amd64
-	$(MAKE) generate-crds
 	cp bin/provider package/
 	cp config/crd/nutanix.crossplane.io_*.yaml package/
 
