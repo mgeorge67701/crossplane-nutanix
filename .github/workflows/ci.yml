@@ -157,7 +157,7 @@ jobs:
         echo "Converted tabs to spaces in YAML files"
         
         # Use Crossplane CLI to create package with proper manifest.json
-        crank xpkg build --package-root=package --output=provider-nutanix-${VERSION}.xpkg
+        crank xpkg build --package-root=package --package-file=provider-nutanix-${VERSION}.xpkg
         echo "Package created successfully"
         ls -la provider-nutanix-${VERSION}.xpkg
         file provider-nutanix-${VERSION}.xpkg
@@ -222,7 +222,7 @@ jobs:
         echo "Converted tabs to spaces in YAML files"
         
         # Use Crossplane CLI to create package with proper manifest.json
-        crank xpkg build --package-root=package --output=provider-nutanix-${VERSION}.xpkg
+        crank xpkg build --package-root=package --package-file=provider-nutanix-${VERSION}.xpkg
         echo "Package created successfully"
         ls -la provider-nutanix-${VERSION}.xpkg
         file provider-nutanix-${VERSION}.xpkg
@@ -311,7 +311,7 @@ jobs:
         echo "Converted tabs to spaces in YAML files"
         
         # Use Crossplane CLI to create package with proper manifest.json
-        crank xpkg build --package-root=package --output=provider-nutanix-${VERSION}.xpkg
+        crank xpkg build --package-root=package --package-file=provider-nutanix-${VERSION}.xpkg
         echo "Package created successfully"
         ls -la provider-nutanix-${VERSION}.xpkg
         file provider-nutanix-${VERSION}.xpkg
