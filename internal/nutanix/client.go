@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/mgeorge67701/provider-nutanix/apis/v1alpha1"
+	"github.com/mgeorge67701/crossplane-nutanix/apis/v1alpha1"
 )
 
 // Client is a stub for the Nutanix Prism API client.

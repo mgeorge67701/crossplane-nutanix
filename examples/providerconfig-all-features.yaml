@@ -13,14 +13,14 @@ spec:
       key: credentials
 
   # Configure LoB (Line of Business) validation for VirtualMachines.
-  # If 'isLoBMandatory' is true, the 'lob' field in VirtualMachine spec is required.
-  # If 'lob' is provided, its value must be one of the 'allowedLoBs'.
-  allowedLoBs:
+  # If 'isLobMandatory' is true, the 'lob' field in VirtualMachine spec is required.
+  # If 'lob' is provided, its value must be one of the 'allowedLobs'.
+  allowedLobs:
     - CLOUD
     - SECURITY
     - DEV
     - PROD
-  isLoBMandatory: true # Set to false if LoB field should be optional
+  isLobMandatory: true # Set to false if LoB field should be optional
 
   # Define Prism Central endpoints for different datacenters.
   # The provider will use the 'datacenter' field in the VirtualMachine spec

@@ -11,9 +11,9 @@ import (
 	"strings"
 
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
-	"github.com/mgeorge67701/provider-nutanix/apis/v1alpha1"
-	"github.com/mgeorge67701/provider-nutanix/apis/v1beta1"
-	"github.com/mgeorge67701/provider-nutanix/internal/nutanix"
+	"github.com/mgeorge67701/crossplane-nutanix/apis/v1alpha1"
+	"github.com/mgeorge67701/crossplane-nutanix/apis/v1beta1"
+	"github.com/mgeorge67701/crossplane-nutanix/internal/nutanix"
 	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"

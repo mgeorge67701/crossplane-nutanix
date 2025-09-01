@@ -25,8 +25,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
-	"github.com/mgeorge67701/provider-nutanix/apis"
-	"github.com/mgeorge67701/provider-nutanix/internal/controller"
+	"github.com/mgeorge67701/crossplane-nutanix/apis"
+	"github.com/mgeorge67701/crossplane-nutanix/internal/controller"
 )
 
 func main() {

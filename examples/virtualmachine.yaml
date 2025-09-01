@@ -10,6 +10,6 @@ spec:
   datacenter: "dc-alpha" # Specify the datacenter for Prism Central endpoint selection
   imageName: "ubuntu-22.04-cloud" # Can be a full or partial image name (e.g., "rhel8", "win2022"). The provider will dynamically resolve the image UUID from Nutanix Prism Central, selecting the latest matching image if a partial name is provided.
   subnetName: "my-network-subnet" # The provider will dynamically resolve the subnet UUID from Nutanix Prism Central.
-  lob: "CLOUD" # Must be one of the allowedLoBs in ProviderConfig if mandatory
+  lob: "CLOUD" # Must be one of the allowedLobs in ProviderConfig if mandatory
   providerConfigRef:
     name: all-features-config
