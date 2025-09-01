@@ -179,16 +179,31 @@ jobs:
         path: provider-nutanix-*.xpkg
 
   release:
-    if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/')
+    if: (github.event_name == 'release' || startsWith(github.ref, 'refs/tags/')) || (github.ref == 'refs/heads/main' && github.event_name == 'push')
     runs-on: ubuntu-latest
+    needs: [auto-tag]
     steps:
     - uses: actions/checkout@v4
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
         go-version: '1.24'
+    - name: Get version
+      id: version
+      run: |
+        if [ "${{ needs.auto-tag.outputs.version }}" != "" ]; then
+          # Use version from auto-tag job
+          VERSION="${{ needs.auto-tag.outputs.version }}"
+          VERSION=${VERSION#v}  # Remove 'v' prefix
+        else
+          # Use version from tag (for manual tag pushes)
+          VERSION=${GITHUB_REF_NAME#v}
+        fi
+        echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+        echo "Using version: $VERSION"
     - name: Build all platforms
       run: |
+        VERSION="${{ steps.version.outputs.VERSION }}"
         mkdir -p dist
         GOOS=linux GOARCH=amd64 make build
         cp bin/provider dist/provider-nutanix_linux_amd64
@@ -205,6 +220,7 @@ jobs:
         sudo mv crank /usr/local/bin/
     - name: Build Crossplane package
       run: |
+        VERSION="${{ steps.version.outputs.VERSION }}"
         # Build Linux/amd64 binary for the package
         make copy-provider
         find package/ -name "*.tmp" -delete || true
@@ -221,19 +237,16 @@ jobs:
         echo "--- Content of package/crossplane.yaml AFTER sync ---"
         cat package/crossplane.yaml
         
-        VERSION=${GITHUB_REF_NAME#v}
         echo "Building package version: $VERSION"
         
         # Create manifest.json manually for Upbound compatibility
-        cat > package/manifest.json << 'EOF'
-        {
+        echo '{
           "apiVersion": "meta.pkg.crossplane.io/v1",
           "kind": "Provider",
           "metadata": {
             "name": "provider-nutanix"
           }
-        }
-        EOF
+        }' > package/manifest.json
         
         # Use manual tar creation with manifest.json included
         tar -cf provider-nutanix-${VERSION}.xpkg -C package .
@@ -266,6 +279,9 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     needs: package
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      version_created: ${{ steps.should_tag.outputs.should_tag }}
     steps:
     - uses: actions/checkout@v4
       with:
@@ -339,6 +355,7 @@ jobs:
         
         echo "Next version: $NEW_VERSION"
         echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+        echo "version_created=true" >> $GITHUB_OUTPUT
     - name: Create and push tag
       if: steps.should_tag.outputs.should_tag == 'true'
       run: |
@@ -366,6 +383,10 @@ jobs:
         git push origin "$NEW_VERSION"
         echo "Successfully created and pushed tag: $NEW_VERSION"
         
+        # The tag push will trigger a new workflow run with the tag context
+        # which will then execute the release and publish-to-upbound jobs
+        echo "Tag $NEW_VERSION pushed - this will trigger a separate release workflow run"
+        
         # Add a summary for the GitHub Actions run
         echo "## 🚀 Auto-Release Created" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
@@ -375,19 +396,33 @@ jobs:
         echo "The release pipeline will now automatically start to publish this version to Upbound Marketplace." >> $GITHUB_STEP_SUMMARY
 
   publish-to-upbound:
-    if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/')
+    if: (github.event_name == 'release' || startsWith(github.ref, 'refs/tags/')) || (github.ref == 'refs/heads/main' && github.event_name == 'push')
     runs-on: ubuntu-latest
-    needs: release
+    needs: [release, auto-tag]
     steps:
     - uses: actions/checkout@v4
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
         go-version: '1.24'
+    - name: Get version
+      id: version
+      run: |
+        if [ "${{ needs.auto-tag.outputs.version }}" != "" ]; then
+          # Use version from auto-tag job
+          VERSION="${{ needs.auto-tag.outputs.version }}"
+          VERSION=${VERSION#v}  # Remove 'v' prefix
+        else
+          # Use version from tag (for manual tag pushes)
+          VERSION=${GITHUB_REF_NAME#v}
+        fi
+        echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+        echo "Using version: $VERSION"
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
     - name: Install Upbound CLI
       run: |
+        # Install latest Upbound CLI
         curl -sL https://cli.upbound.io | sh
         sudo mv up /usr/local/bin/
         up version
@@ -407,7 +442,7 @@ jobs:
         UPBOUND_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
     - name: Build and push Docker image to GitHub Container Registry
       run: |
-        VERSION=${GITHUB_REF_NAME#v}
+        VERSION="${{ steps.version.outputs.VERSION }}"
         echo "Building multi-platform Docker image version: $VERSION"
         echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
         docker buildx create --use --name multi-platform-builder
@@ -420,6 +455,7 @@ jobs:
         echo "Multi-platform Docker image pushed: ghcr.io/mgeorge67701/provider-nutanix:${VERSION}"
     - name: Build Crossplane package
       run: |
+        VERSION="${{ steps.version.outputs.VERSION }}"
         make copy-provider
         find package/ -name "*.tmp" -delete || true
         find package/ -name "*.bak" -delete || true
@@ -427,35 +463,49 @@ jobs:
         rm -f package/README.md
         rm -rf package/examples
         
-        VERSION=${GITHUB_REF_NAME#v}
         echo "Building package version: $VERSION"
         echo "Package will be built as: provider-nutanix-${VERSION}.xpkg"
         sed -i "s|image:.*|image: ghcr.io/mgeorge67701/provider-nutanix:${VERSION}|" package/crossplane.yaml
         
-        # Create manifest.json manually for Upbound compatibility
-        cat > package/manifest.json << 'EOF'
-        {
-          "apiVersion": "meta.pkg.crossplane.io/v1",
-          "kind": "Provider",
-          "metadata": {
-            "name": "provider-nutanix"
-          }
-        }
-        EOF
-        
-        # Use manual tar creation with manifest.json included
-        tar -cf provider-nutanix-${VERSION}.xpkg -C package .
-        echo "Package created successfully"
-        ls -la provider-nutanix-${VERSION}.xpkg
-        file provider-nutanix-${VERSION}.xpkg
-        echo "Package size: $(du -h provider-nutanix-${VERSION}.xpkg)"
-        
-        # Verify package contents (should include manifest.json)
-        echo "Package contents:"
-        tar -tf provider-nutanix-${VERSION}.xpkg | head -10
+        # Try using Crossplane CLI to build the package (should automatically create manifest.json)
+        echo "Building package with Crossplane CLI..."
+        cd package
+        if crank xpkg build --package-file=../provider-nutanix-${VERSION}.xpkg .; then
+          echo "✅ Package built successfully with Crossplane CLI"
+          cd ..
+          ls -la provider-nutanix-${VERSION}.xpkg
+          file provider-nutanix-${VERSION}.xpkg
+          echo "Package size: $(du -h provider-nutanix-${VERSION}.xpkg)"
+          
+          # Verify package contents
+          echo "=== Package contents ==="
+          tar -tzf provider-nutanix-${VERSION}.xpkg
+        else
+          echo "❌ Crossplane CLI build failed, falling back to manual approach"
+          cd ..
+          
+          # Create manifest.json manually
+          echo '{
+            "apiVersion": "meta.pkg.crossplane.io/v1",
+            "kind": "Provider",
+            "metadata": {
+              "name": "provider-nutanix"
+            }
+          }' > package/manifest.json
+          
+          # Use manual tar creation
+          tar -czf provider-nutanix-${VERSION}.xpkg -C package .
+          echo "Package created manually"
+          ls -la provider-nutanix-${VERSION}.xpkg
+          file provider-nutanix-${VERSION}.xpkg
+          
+          # Verify package contents
+          echo "=== Package contents ==="
+          tar -tzf provider-nutanix-${VERSION}.xpkg
+        fi
     - name: Verify package and repository
       run: |
-        VERSION=${GITHUB_REF_NAME#v}
+        VERSION="${{ steps.version.outputs.VERSION }}"
         echo "Verifying package file exists..."
         ls -la provider-nutanix-${VERSION}.xpkg
         echo "Checking repository access..."
@@ -468,25 +518,64 @@ jobs:
         echo "Ready to push package: xpkg.upbound.io/mgeorge67701/provider-nutanix:${VERSION}"
     - name: Push to Upbound Marketplace
       run: |
-        VERSION=${GITHUB_REF_NAME#v}
+        VERSION="${{ steps.version.outputs.VERSION }}"
         echo "Pushing package version: ${VERSION}"
         echo "Full ref name: ${GITHUB_REF_NAME}"
         
-        # Try pushing the package with error handling
+        # Verify package exists and contents
+        echo "=== Pre-push verification ==="
+        ls -la provider-nutanix-${VERSION}.xpkg
+        echo "Package contents:"
+        tar -tzf provider-nutanix-${VERSION}.xpkg | head -10
+        
+        # Extract and verify manifest.json before push
+        if tar -tzf provider-nutanix-${VERSION}.xpkg | grep -q "manifest.json"; then
+          echo "✅ manifest.json confirmed in package"
+          echo "Manifest content:"
+          tar -xzf provider-nutanix-${VERSION}.xpkg manifest.json -O | head -20
+        else
+          echo "❌ manifest.json missing from package - this will cause push to fail"
+          exit 1
+        fi
+        
+        # Try multiple push approaches
+        echo "=== Attempting package push ==="
+        
+        # Method 1: Standard push
         if up xpkg push xpkg.upbound.io/mgeorge67701/provider-nutanix:${VERSION} -f provider-nutanix-${VERSION}.xpkg; then
-          echo "Successfully pushed version ${VERSION}"
+          echo "✅ Successfully pushed version ${VERSION} (method 1)"
+          SUCCESS=true
+        else
+          echo "❌ Method 1 failed, trying alternative approach..."
+          SUCCESS=false
           
+          # Method 2: Extract and repack with different compression
+          echo "Trying repack with different compression..."
+          mkdir -p /tmp/package-repack
+          tar -xzf provider-nutanix-${VERSION}.xpkg -C /tmp/package-repack
+          cd /tmp/package-repack
+          tar -cf ../provider-nutanix-${VERSION}-alt.xpkg .
+          cd -
+          
+          if up xpkg push xpkg.upbound.io/mgeorge67701/provider-nutanix:${VERSION} -f /tmp/provider-nutanix-${VERSION}-alt.xpkg; then
+            echo "✅ Successfully pushed version ${VERSION} (method 2)"
+            SUCCESS=true
+          else
+            echo "❌ Method 2 also failed"
+            SUCCESS=false
+          fi
+        fi
+        
+        if [ "$SUCCESS" = "true" ]; then
           # Only push as latest if this is not a pre-release
           if [[ ! "${VERSION}" =~ (alpha|beta|rc) ]]; then
             echo "Pushing as latest..."
-            up xpkg push xpkg.upbound.io/mgeorge67701/provider-nutanix:latest -f provider-nutanix-${VERSION}.xpkg
+            up xpkg push xpkg.upbound.io/mgeorge67701/provider-nutanix:latest -f provider-nutanix-${VERSION}.xpkg || echo "Failed to push as latest, but version push succeeded"
             echo "Successfully pushed as latest"
           fi
         else
-          echo "Push failed. Let's debug the package format:"
+          echo "All push methods failed. Package details:"
           file provider-nutanix-${VERSION}.xpkg
-          echo "Package contents:"
-          tar -tf provider-nutanix-${VERSION}.xpkg | head -20
           echo "Upbound CLI version:"
           up version
           exit 1
