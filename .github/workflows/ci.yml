@@ -462,9 +462,11 @@ jobs:
         up version
     - name: Install Crossplane CLI
       run: |
-        curl -sL https://releases.crossplane.io/stable/current/bin/linux_amd64/crank -o crank
-        chmod +x crank
-        sudo mv crank /usr/local/bin/
+        # Install latest Crossplane CLI
+        curl -sL "https://releases.crossplane.io/stable/current/bin/linux_amd64/crossplane" -o crossplane
+        chmod +x crossplane
+        sudo mv crossplane /usr/local/bin/
+        crossplane --help
     - name: Login to Upbound
       run: |
         echo "Logging in to Upbound..."
@@ -535,7 +537,7 @@ jobs:
           
           # Create package using tar (Crossplane packages are just tar files)
           cd minimal_package
-          tar -czf ../provider-nutanix-${VERSION}.xpkg *
+          tar -cf ../provider-nutanix-${VERSION}.xpkg *
           cd ..
           rm -rf minimal_package
           
@@ -579,18 +581,14 @@ jobs:
         if file provider-nutanix-${VERSION}.xpkg | grep -q "gzip"; then
           echo "Package is gzip compressed"
           tar -tzf provider-nutanix-${VERSION}.xpkg
+          PACKAGE_FILES=$(tar -tzf provider-nutanix-${VERSION}.xpkg)
         else
           echo "Package is uncompressed tar"  
           tar -tf provider-nutanix-${VERSION}.xpkg
-        fi
-        
-        # Verify essential Crossplane files exist
-        if file provider-nutanix-${VERSION}.xpkg | grep -q "gzip"; then
-          PACKAGE_FILES=$(tar -tzf provider-nutanix-${VERSION}.xpkg)
-        else
           PACKAGE_FILES=$(tar -tf provider-nutanix-${VERSION}.xpkg)
         fi
         
+        # Verify essential Crossplane files exist
         if echo "$PACKAGE_FILES" | grep -q "crossplane.yaml"; then
           echo "✅ crossplane.yaml found in package"
         else
