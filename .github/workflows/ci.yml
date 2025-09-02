@@ -115,16 +115,18 @@ jobs:
         run: sed -i -e "s/VERSION_PLACEHOLDER/${{ needs.auto_tag.outputs.version }}/g" package/crossplane.yaml
       - name: Install crossplane CLI
         run: |
+          mkdir -p /tmp/bin
           os=$(uname | tr '[:upper:]' '[:lower:]')
           arch=$(uname -m | sed 's/x86_64/amd64/')
-          [ "$arch" = "arm64" ] && arch="amd64"  # Use amd64 on GitHub Actions
-          curl -sLO "https://releases.crossplane.io/stable/v1.13.2/bin/${os}_${arch}/crossplane"
-          chmod +x crossplane
-          # Make sure this CLI takes precedence over any installed via go
-          sudo mv crossplane /usr/local/bin/crossplane
+          [ "$arch" = "arm64" ] && arch="amd64"
+          curl -sL "https://releases.crossplane.io/stable/v1.13.2/bin/${os}_${arch}/crossplane" -o /tmp/bin/crossplane
+          chmod +x /tmp/bin/crossplane
+      - name: Verify crossplane CLI
+        run: |
+          /tmp/bin/crossplane version
       - name: Build .xpkg
         run: |
-          crossplane xpkg build --package-root=package -o provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
+          /tmp/bin/crossplane xpkg build --package-root=package -o provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
       - name: Upload .xpkg
         uses: actions/upload-artifact@v4
         with:
@@ -159,13 +161,15 @@ jobs:
             ${{ runner.os }}-go-
       - name: Install crossplane CLI
         run: |
+          mkdir -p /tmp/bin
           os=$(uname | tr '[:upper:]' '[:lower:]')
           arch=$(uname -m | sed 's/x86_64/amd64/')
-          [ "$arch" = "arm64" ] && arch="amd64"  # Use amd64 on GitHub Actions
-          curl -sLO "https://releases.crossplane.io/stable/v1.13.2/bin/${os}_${arch}/crossplane"
-          chmod +x crossplane
-          # Make sure this CLI takes precedence over any installed via go
-          sudo mv crossplane /usr/local/bin/crossplane
+          [ "$arch" = "arm64" ] && arch="amd64"
+          curl -sL "https://releases.crossplane.io/stable/v1.13.2/bin/${os}_${arch}/crossplane" -o /tmp/bin/crossplane
+          chmod +x /tmp/bin/crossplane
+      - name: Verify crossplane CLI
+        run: |
+          /tmp/bin/crossplane version
       - name: Login to Upbound
         env:
           UPBOUND_ACCESS_ID: ${{ secrets.UPBOUND_ACCESS_ID }}
@@ -174,8 +178,8 @@ jobs:
           echo "$UPBOUND_TOKEN" | docker login xpkg.upbound.io -u "$UPBOUND_ACCESS_ID" --password-stdin
       - name: Push package to registry
         run: |
-          crossplane xpkg push -f provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg xpkg.upbound.io/mgeorge67701/provider-nutanix:${{ needs.auto_tag.outputs.version }}
-          crossplane xpkg push -f provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg xpkg.upbound.io/mgeorge67701/provider-nutanix:latest
+          /tmp/bin/crossplane xpkg push -f provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg xpkg.upbound.io/mgeorge67701/provider-nutanix:${{ needs.auto_tag.outputs.version }}
+          /tmp/bin/crossplane xpkg push -f provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg xpkg.upbound.io/mgeorge67701/provider-nutanix:latest
 
   create_release:
     needs: [publish, auto_tag]
