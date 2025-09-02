@@ -69,27 +69,158 @@ spec:
 
 ## Examples
 
-The `examples/` directory contains comprehensive examples:
+The `examples/` directory contains comprehensive examples.
 
-### Basic Virtual Machine
+<details>
+<summary><b>Basic Virtual Machine</b></summary>
 
-- **File**: [`examples/virtualmachine.yaml`](examples/virtualmachine.yaml)
-- **Description**: Simple VM with basic configuration
+**File**: `examples/virtualmachine.yaml`
+**Description**: Simple VM with basic configuration.
 
-### Advanced Virtual Machine
+```yaml
+apiVersion: nutanix.crossplane.io/v1alpha1
+kind: VirtualMachine
+metadata:
+  name: example-vm
+spec:
+  name: "my-crossplane-vm"
+  numVcpus: 2
+  memorySizeMib: 4096
+  clusterName: "aza-ntnx-01"  # Specify the cluster name to fetch details dynamically
+  datacenter: "dc-alpha" # Specify the datacenter for Prism Central endpoint selection
+  imageName: "ubuntu-22.04-cloud" # Can be a full or partial image name (e.g., "rhel8", "win2022"). The provider will dynamically resolve the image UUID from Nutanix Prism Central, selecting the latest matching image if a partial name is provided.
+  subnetName: "my-network-subnet" # The provider will dynamically resolve the subnet UUID from Nutanix Prism Central.
+  lob: "CLOUD" # Must be one of the allowedLobs in ProviderConfig if mandatory
+  providerConfigRef:
+    name: all-features-config
+```
+</details>
 
-- **File**: [`examples/virtualmachine-advanced.yaml`](examples/virtualmachine-advanced.yaml)
-- **Description**: VM with additional disks and external facts
+<details>
+<summary><b>Advanced Virtual Machine</b></summary>
 
-### Full ProviderConfig
+**File**: `examples/virtualmachine-advanced.yaml`
+**Description**: VM with additional disks and external facts.
 
-- **File**: [`examples/providerconfig-all-features.yaml`](examples/providerconfig-all-features.yaml)
-- **Description**: Complete ProviderConfig showing all available features
+```yaml
+apiVersion: nutanix.crossplane.io/v1alpha1
+kind: VirtualMachine
+metadata:
+  name: example-vm-advanced
+spec:
+  name: "my-advanced-crossplane-vm"
+  numVcpus: 4
+  memorySizeMib: 8192
+  clusterName: "aza-ntnx-01"
+  datacenter: "dc-beta" # Specify the datacenter for Prism Central endpoint selection
+  imageName: "rhel8" # Example: partial image name, provider selects latest RHEL 8
+  subnetName: "my-network-subnet"
+  lob: "SECURITY" # Example: another valid LoB from ProviderConfig
+  additionalDisks:
+    - deviceIndex: 1
+      sizeGb: 50
+      imageName: "data-disk-template" # Optional: use an image for the disk
+    - deviceIndex: 2
+      sizeGb: 100
+  externalFacts:
+    environment: "production"
+    application: "webserver"
+    owner: "devops-team"
+  providerConfigRef:
+    name: all-features-config
+```
+</details>
 
-### Network Details ConfigMap
+<details>
+<summary><b>Full ProviderConfig</b></summary>
 
-- **File**: [`examples/network-details-configmap.yaml`](examples/network-details-configmap.yaml)
-- **Description**: Example ConfigMap for network configuration data
+**File**: `examples/providerconfig-all-features.yaml`
+**Description**: Complete ProviderConfig showing all available features.
+
+```yaml
+apiVersion: nutanix.crossplane.io/v1beta1
+kind: ProviderConfig
+metadata:
+  name: all-features-config
+spec:
+  # Default credentials for the provider. These are used if no datacenter-specific
+  # credentials are provided or if no datacenter is specified in the VM spec.
+  credentials:
+    source: Secret
+    secretRef:
+      namespace: crossplane-system
+      name: nutanix-creds-default
+      key: credentials
+
+  # Configure LoB (Line of Business) validation for VirtualMachines.
+  # If 'isLobMandatory' is true, the 'lob' field in VirtualMachine spec is required.
+  # If 'lob' is provided, its value must be one of the 'allowedLobs'.
+  allowedLobs:
+    - CLOUD
+    - SECURITY
+    - DEV
+    - PROD
+  isLobMandatory: true # Set to false if LoB field should be optional
+
+  # Define Prism Central endpoints for different datacenters.
+  # The provider will use the 'datacenter' field in the VirtualMachine spec
+  # to select the appropriate endpoint from this map.
+  prismCentralEndpoints:
+    dc-alpha: "https://pc-alpha.example.com:9440"
+    dc-beta: "https://pc-beta.example.com:9440"
+    dc-gamma: "https://pc-gamma.example.com:9440"
+
+  # Define datacenter-specific credentials.
+  # These credentials will override the default 'credentials' for the specified datacenter.
+  # If a datacenter is specified in the VM, the provider will first look for
+  # credentials here. If not found, it falls back to the default credentials.
+  datacenterCredentials:
+    dc-alpha:
+      source: Secret
+      secretRef:
+        namespace: crossplane-system
+        name: nutanix-creds-alpha
+        key: credentials
+    dc-beta:
+      source: Secret
+      secretRef:
+        namespace: crossplane-system
+        name: nutanix-creds-beta
+        key: credentials
+```
+</details>
+
+<details>
+<summary><b>Network Details ConfigMap</b></summary>
+
+**File**: `examples/network-details-configmap.yaml`
+**Description**: Example ConfigMap for network configuration data.
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: network-details
+  namespace: crossplane-system
+data:
+  network-details.json: |
+    {
+      "domain": "example.com",
+      "nameserver": "192.168.1.1",
+      "gateway": "192.168.1.254",
+      "network": "192.168.1.0/24",
+      "subnet": "example-subnet",
+      "email": "admin@example.com",
+      "puppet_master": "puppet.example.com",
+      "network_management_server": "nms.example.com",
+      "foreman_host": "foreman.example.com",
+      "allowed_repos": [
+        "test1",
+        "test2"
+      ]
+    }
+```
+</details>
 
 ## Configuration
 
