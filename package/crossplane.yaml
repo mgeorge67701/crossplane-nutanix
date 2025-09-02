@@ -8,8 +8,6 @@ metadata:
     meta.crossplane.io/license: Apache-2.0
     meta.crossplane.io/description: |
       A Crossplane provider for Nutanix
-    meta.crossplane.io/readme: |
-      A Crossplane provider for Nutanix virtualization platform.
 spec:
   controller:
-    image: ghcr.io/mgeorge67701/provider-nutanix:VERSION_PLACEHOLDER
+    image: xpkg.upbound.io/mgeorge67701/provider-nutanix-controller:VERSION_PLACEHOLDER
