@@ -20,6 +20,16 @@ jobs:
         uses: actions/setup-go@v4
         with:
           go-version: '1.21'
+          cache: false # Disable the built-in cache to avoid tar issues
+      - name: Go cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
       - name: Run unit tests
         run: go test ./...
 
@@ -77,16 +87,32 @@ jobs:
         uses: actions/setup-go@v4
         with:
           go-version: '1.21'
+          cache: false # Disable the built-in cache to avoid tar issues
+      - name: Go cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
       - name: Build provider binary
         run: go build -o package/provider ./cmd/provider
       - name: Replace version placeholder
         run: sed -i -e "s/VERSION_PLACEHOLDER/${{ needs.auto_tag.outputs.version }}/g" package/crossplane.yaml
       - name: Install crossplane CLI
-        run: go install github.com/crossplane/crossplane/cmd/crossplane@latest
+        run: |
+          os=$(uname | tr '[:upper:]' '[:lower:]')
+          arch=$(uname -m | sed 's/x86_64/amd64/')
+          [ "$arch" = "arm64" ] && arch="amd64"  # Use amd64 on GitHub Actions
+          curl -sLO "https://releases.crossplane.io/stable/v1.13.2/bin/${os}_${arch}/crossplane"
+          chmod +x crossplane
+          # Make sure this CLI takes precedence over any installed via go
+          sudo mv crossplane /usr/local/bin/crossplane
       - name: Build .xpkg
         run: |
-          export PATH=$PATH:$(go env GOPATH)/bin
-          crossplane xpkg build ./package -o provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
+          crossplane xpkg build --package-root=package -o provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
       - name: Upload .xpkg
         uses: actions/upload-artifact@v4
         with:
@@ -109,19 +135,35 @@ jobs:
         uses: actions/setup-go@v4
         with:
           go-version: '1.21'
+          cache: false # Disable the built-in cache to avoid tar issues
+      - name: Go cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
       - name: Install crossplane CLI
-        run: go install github.com/crossplane/crossplane/cmd/crossplane@latest
+        run: |
+          os=$(uname | tr '[:upper:]' '[:lower:]')
+          arch=$(uname -m | sed 's/x86_64/amd64/')
+          [ "$arch" = "arm64" ] && arch="amd64"  # Use amd64 on GitHub Actions
+          curl -sLO "https://releases.crossplane.io/stable/v1.13.2/bin/${os}_${arch}/crossplane"
+          chmod +x crossplane
+          # Make sure this CLI takes precedence over any installed via go
+          sudo mv crossplane /usr/local/bin/crossplane
       - name: Login to Upbound
         env:
           UPBOUND_ACCESS_ID: ${{ secrets.UPBOUND_ACCESS_ID }}
           UPBOUND_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
         run: |
-          export PATH=$PATH:$(go env GOPATH)/bin
-          crossplane xpkg login --username "$UPBOUND_ACCESS_ID" --password "$UPBOUND_TOKEN"
+          echo "$UPBOUND_TOKEN" | docker login xpkg.upbound.io -u "$UPBOUND_ACCESS_ID" --password-stdin
       - name: Push package to registry
         run: |
-          export PATH=$PATH:$(go env GOPATH)/bin
           crossplane xpkg push -f provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg xpkg.upbound.io/mgeorge67701/provider-nutanix:${{ needs.auto_tag.outputs.version }}
+          crossplane xpkg push -f provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg xpkg.upbound.io/mgeorge67701/provider-nutanix:latest
 
   create_release:
     needs: [publish, auto_tag]
