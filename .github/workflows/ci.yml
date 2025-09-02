@@ -462,11 +462,13 @@ jobs:
         up version
     - name: Install Crossplane CLI
       run: |
-        # Install latest Crossplane CLI
-        curl -sL "https://releases.crossplane.io/stable/current/bin/linux_amd64/crossplane" -o crossplane
-        chmod +x crossplane
-        sudo mv crossplane /usr/local/bin/
-        crossplane --help
+        # Install Crossplane CLI (the package management tool, not the core controller)
+        curl -sL "https://releases.crossplane.io/stable/current/bin/linux_amd64/crank" -o crank
+        chmod +x crank
+        sudo mv crank /usr/local/bin/
+        # Create symlink for both command names
+        sudo ln -sf /usr/local/bin/crank /usr/local/bin/crossplane-cli
+        crank --help | head -5
     - name: Login to Upbound
       run: |
         echo "Logging in to Upbound..."
@@ -505,7 +507,7 @@ jobs:
         
         # Try using Crossplane CLI to build the package
         echo "Building package with Crossplane CLI..."
-        if crossplane xpkg build --package-root=package --package-file=provider-nutanix-${VERSION}.xpkg; then
+        if crank xpkg build --package-root=package --package-file=provider-nutanix-${VERSION}.xpkg; then
           echo "✅ Package built successfully with Crossplane CLI"
           ls -la provider-nutanix-${VERSION}.xpkg
           file provider-nutanix-${VERSION}.xpkg
@@ -603,23 +605,54 @@ jobs:
           exit 1
         fi
         
-        # Try pushing the package - use crossplane CLI first (recommended by docs)
-        echo "=== Attempting package push with crossplane CLI ==="
+        # Try pushing the package - use crank CLI first (recommended by docs)
+        echo "=== Attempting package push with crank CLI ==="
         
-        if crossplane xpkg push xpkg.upbound.io/mgeorge67701/provider-nutanix:${VERSION} -f provider-nutanix-${VERSION}.xpkg; then
-          echo "✅ Successfully pushed version ${VERSION} with crossplane CLI"
+        if crank xpkg push xpkg.upbound.io/mgeorge67701/provider-nutanix:${VERSION} -f provider-nutanix-${VERSION}.xpkg; then
+          echo "✅ Successfully pushed version ${VERSION} with crank CLI"
           
           # Only push as latest if this is not a pre-release
           if [[ ! "${VERSION}" =~ (alpha|beta|rc) ]]; then
             echo "Pushing as latest..."
-            if crossplane xpkg push xpkg.upbound.io/mgeorge67701/provider-nutanix:latest -f provider-nutanix-${VERSION}.xpkg; then
+            if crank xpkg push xpkg.upbound.io/mgeorge67701/provider-nutanix:latest -f provider-nutanix-${VERSION}.xpkg; then
               echo "✅ Successfully pushed as latest"
             else
               echo "⚠️ Failed to push as latest, but version push succeeded"
             fi
           fi
         else
-          echo "❌ Crossplane CLI push failed, trying with up CLI..."
+          echo "❌ Crank CLI push failed, trying with up CLI..."
+          
+          # For up CLI, we need to add manifest.json to the existing package
+          echo "Preparing package for up CLI (requires manifest.json)..."
+          
+          # Extract existing package
+          mkdir -p temp_extract
+          cd temp_extract
+          if file ../provider-nutanix-${VERSION}.xpkg | grep -q "gzip"; then
+            tar -xzf ../provider-nutanix-${VERSION}.xpkg
+          else
+            tar -xf ../provider-nutanix-${VERSION}.xpkg
+          fi
+          
+          # Add minimal manifest.json for up CLI
+          cat > manifest.json << 'EOF'
+        {
+          "apiVersion": "meta.pkg.crossplane.io/v1",
+          "kind": "Provider",
+          "metadata": {
+            "name": "provider-nutanix"
+          }
+        }
+        EOF
+          
+          # Recreate package with manifest.json
+          tar -cf ../provider-nutanix-${VERSION}.xpkg *
+          cd ..
+          rm -rf temp_extract
+          
+          echo "Added manifest.json to package for up CLI compatibility"
+          tar -tf provider-nutanix-${VERSION}.xpkg | head -10
           
           if up xpkg push xpkg.upbound.io/mgeorge67701/provider-nutanix:${VERSION} -f provider-nutanix-${VERSION}.xpkg; then
             echo "✅ Successfully pushed version ${VERSION} with up CLI"
@@ -643,7 +676,7 @@ jobs:
               tar -tf provider-nutanix-${VERSION}.xpkg
             fi
             echo "CLI versions:"
-            crossplane version
+            crank version
             up version
             exit 1
           fi
