@@ -119,7 +119,7 @@ jobs:
           sudo mv crossplane /usr/local/bin
       - name: Verify crossplane CLI
         run: |
-          crossplane version --client
+          crossplane version
       - name: Build .xpkg
         run: |
           crossplane xpkg build --package-root=package -o provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
@@ -161,14 +161,13 @@ jobs:
           sudo mv crossplane /usr/local/bin
       - name: Verify crossplane CLI
         run: |
-          crossplane version --client
+          crossplane version
       - name: Login to Upbound
         env:
           UPBOUND_ACCESS_ID: ${{ secrets.UPBOUND_ACCESS_ID }}
           UPBOUND_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
         run: |
-          docker logout xpkg.upbound.io || true
-          echo "$UPBOUND_TOKEN" | docker login xpkg.upbound.io -u "$UPBOUND_ACCESS_ID" --password-stdin
+          echo "$UPBOUND_TOKEN" | docker login xpkg.upbound.io
       - name: Push package to registry
         run: |
           crossplane xpkg push -f provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg xpkg.upbound.io/mgeorge67701/provider-nutanix:${{ needs.auto_tag.outputs.version }}
