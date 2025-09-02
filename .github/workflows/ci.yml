@@ -167,6 +167,7 @@ jobs:
           UPBOUND_ACCESS_ID: ${{ secrets.UPBOUND_ACCESS_ID }}
           UPBOUND_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
         run: |
+          echo "Attempting login with Access ID: $UPBOUND_ACCESS_ID"
           echo "$UPBOUND_TOKEN" | docker login xpkg.upbound.io -u "$UPBOUND_ACCESS_ID" --password-stdin
       - name: Push package to registry
         run: |
