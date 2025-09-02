@@ -12,4 +12,4 @@ metadata:
       A Crossplane provider for Nutanix virtualization platform.
 spec:
   controller:
-    image: xpkg.upbound.io/mgeorge67701/provider-nutanix:v1.1.9
+    image: ghcr.io/mgeorge67701/provider-nutanix:VERSION_PLACEHOLDER

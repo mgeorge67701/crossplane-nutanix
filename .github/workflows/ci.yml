@@ -110,19 +110,19 @@ jobs:
           echo "Tag $VERSION created and pushed"
 
   package:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
-    needs: [test]
+    needs: [test, auto-tag]
     steps:
       - uses: actions/checkout@v4
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version: '1.24'
-      - name: Get version from tag
+      - name: Get version from auto-tag
         id: version
         run: |
-          VERSION=${GITHUB_REF#refs/tags/}
+          VERSION="${{ needs.auto-tag.outputs.version }}"
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
           echo "Building version: $VERSION"
       - name: Build provider binary
@@ -137,7 +137,10 @@ jobs:
       - name: Update package version
         run: |
           VERSION=${{ steps.version.outputs.VERSION }}
-          sed -i "s|image:.*|image: ghcr.io/mgeorge67701/provider-nutanix:${VERSION}|" package/crossplane.yaml
+          echo "Updating package version to: $VERSION"
+          sed -i "s|VERSION_PLACEHOLDER|${VERSION}|" package/crossplane.yaml
+          echo "Updated crossplane.yaml:"
+          cat package/crossplane.yaml
       - name: Build package
         run: |
           echo "Building Crossplane package..."
@@ -150,15 +153,15 @@ jobs:
           path: provider-nutanix-${{ steps.version.outputs.VERSION }}.xpkg
 
   publish:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
-    needs: [package]
+    needs: [package, auto-tag]
     steps:
       - uses: actions/checkout@v4
-      - name: Get version from tag
+      - name: Get version from auto-tag
         id: version
         run: |
-          VERSION=${GITHUB_REF#refs/tags/}
+          VERSION="${{ needs.auto-tag.outputs.version }}"
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
           echo "Publishing version: $VERSION"
       - name: Download package artifact
@@ -183,15 +186,15 @@ jobs:
           echo "Package published successfully to Upbound Marketplace!"
 
   create-release:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
-    needs: [publish]
+    needs: [publish, auto-tag]
     steps:
       - uses: actions/checkout@v4
-      - name: Get version from tag
+      - name: Get version from auto-tag
         id: version
         run: |
-          VERSION=${GITHUB_REF#refs/tags/}
+          VERSION="${{ needs.auto-tag.outputs.version }}"
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
       - name: Download package artifact
         uses: actions/download-artifact@v4
