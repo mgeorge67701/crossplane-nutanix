@@ -266,12 +266,46 @@ jobs:
         sha256sum *.{tar.gz,xpkg} > provider-nutanix_SHA256SUMS
         ls -la
     - name: Upload Release Assets
+      if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'release'
       uses: softprops/action-gh-release@v1
       with:
+        tag_name: ${{ needs.auto-tag.outputs.version || github.ref_name }}
+        name: Release ${{ needs.auto-tag.outputs.version || github.ref_name }}
         files: |
           dist/*.tar.gz
           dist/*.xpkg
           dist/provider-nutanix_SHA256SUMS
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Create GitHub Release for auto-tagged version
+      if: github.ref == 'refs/heads/main' && needs.auto-tag.outputs.version != ''
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ needs.auto-tag.outputs.version }}
+        name: Release ${{ needs.auto-tag.outputs.version }}
+        files: |
+          dist/*.tar.gz
+          dist/*.xpkg
+          dist/provider-nutanix_SHA256SUMS
+        generate_release_notes: true
+        body: |
+          This release was automatically created after successful package build and testing.
+          
+          ## Changes
+          Auto-generated from commits since last release.
+          
+          ## Installation
+          ```bash
+          kubectl apply -f - <<EOF
+          apiVersion: pkg.crossplane.io/v1
+          kind: Provider
+          metadata:
+            name: provider-nutanix
+          spec:
+            package: xpkg.upbound.io/mgeorge67701/provider-nutanix:${{ steps.version.outputs.VERSION }}
+          EOF
+          ```
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
