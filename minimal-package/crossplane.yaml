@@ -1,0 +1,15 @@
+apiVersion: meta.pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-nutanix
+  annotations:
+    meta.crossplane.io/maintainer: Mohan George <mgeorge67701@users.noreply.github.com>
+    meta.crossplane.io/source: github.com/mgeorge67701/crossplane-nutanix
+    meta.crossplane.io/license: Apache-2.0
+    meta.crossplane.io/description: |
+      A Crossplane provider for Nutanix
+    meta.crossplane.io/readme: |
+      A Crossplane provider for Nutanix virtualization platform.
+spec:
+  controller:
+    image: xpkg.upbound.io/mgeorge67701/provider-nutanix:v1.1.9

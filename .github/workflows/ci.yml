@@ -509,6 +509,10 @@ jobs:
         
         # Try using Crossplane CLI to build the package
         echo "Building package with Crossplane CLI..."
+        # Ensure we use clean CRD files from config directory to avoid YAML parsing errors
+        echo "Copying clean CRD files from config directory..."
+        cp config/crd/nutanix.crossplane.io_virtualmachines.yaml package/
+        cp config/crd/nutanix.crossplane.io_providerconfigs.yaml package/
         if crossplane xpkg build --package-root=package --package-file=provider-nutanix-${VERSION}.xpkg; then
           echo "✅ Package built successfully with Crossplane CLI"
           ls -la provider-nutanix-${VERSION}.xpkg
