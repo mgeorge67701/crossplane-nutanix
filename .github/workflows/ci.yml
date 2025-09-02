@@ -182,6 +182,7 @@ jobs:
       - name: Create GitHub release and upload asset
         uses: softprops/action-gh-release@v1
         with:
+          tag_name: ${{ needs.auto_tag.outputs.version }}
           files: provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
