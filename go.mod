@@ -1,6 +1,6 @@
 module github.com/mgeorge67701/crossplane-nutanix
 
-go 1.24.0
+go 1.20
 
 require (
 	github.com/alecthomas/kingpin/v2 v2.4.0
