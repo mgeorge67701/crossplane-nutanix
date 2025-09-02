@@ -162,17 +162,12 @@ jobs:
       - name: Verify crossplane CLI
         run: |
           crossplane version --client
-      - name: Login to Upbound
-        env:
-          UPBOUND_ACCESS_ID: ${{ secrets.UPBOUND_ACCESS_ID }}
-          UPBOUND_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
+      - name: Login to GitHub Container Registry
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+      - name: Push package to GitHub Container Registry
         run: |
-          echo "Attempting login with Access ID: $UPBOUND_ACCESS_ID"
-          echo "$UPBOUND_TOKEN" | docker login xpkg.upbound.io -u "$UPBOUND_ACCESS_ID" --password-stdin
-      - name: Push package to registry
-        run: |
-          crossplane xpkg push -f provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg xpkg.upbound.io/mgeorge67701/provider-nutanix:${{ needs.auto_tag.outputs.version }}
-          crossplane xpkg push -f provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg xpkg.upbound.io/mgeorge67701/provider-nutanix:latest
+          crossplane xpkg push -f provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}
+          crossplane xpkg push -f provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg ghcr.io/${{ github.repository_owner }}/provider-nutanix:latest
 
   create_release:
     needs: [publish, auto_tag]
