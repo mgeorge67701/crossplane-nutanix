@@ -46,35 +46,47 @@ jobs:
         id: set_version
         run: |
           LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-          COMMITS=$(git log ${LAST_TAG}..HEAD --pretty=%s || true)
-          bump="patch"
-          if echo "$COMMITS" | grep -qE 'BREAKING|breaking|major:'; then
-            bump=major
-          elif echo "$COMMITS" | grep -qE '(^feat:|^feature:|minor:)'; then
-            bump=minor
-          fi
-          ver=${LAST_TAG#v}
-          IFS='.' read -r major minor patch <<< "$ver"
-          major=${major:-0}
-          minor=${minor:-0}
-          patch=${patch:-0}
-          if [ "$bump" = "major" ]; then
-            major=$((major+1)); minor=0; patch=0
-          elif [ "$bump" = "minor" ]; then
-            minor=$((minor+1)); patch=0
-          else
-            patch=$((patch+1))
-          fi
-          NEW_TAG="v${major}.${minor}.${patch}"
-          echo "version=${NEW_TAG}" >> $GITHUB_OUTPUT
-          if [ "$NEW_TAG" != "$LAST_TAG" ]; then
+          COMMITS_SINCE_TAG=$(git log ${LAST_TAG}..HEAD --pretty=%s || true)
+          
+          # Default to existing tag
+          VERSION_TO_USE=$LAST_TAG
+          
+          # Only bump version if there are new, relevant commits
+          if [ -n "$COMMITS_SINCE_TAG" ]; then
+            bump="patch"
+            if echo "$COMMITS_SINCE_TAG" | grep -qE 'BREAKING|breaking|major:'; then
+              bump=major
+            elif echo "$COMMITS_SINCE_TAG" | grep -qE '(^feat:|^feature:|minor:)'; then
+              bump=minor
+            fi
+            
+            ver=${LAST_TAG#v}
+            IFS='.' read -r major minor patch <<< "$ver"
+            major=${major:-0}
+            minor=${minor:-0}
+            patch=${patch:-0}
+            
+            if [ "$bump" = "major" ]; then
+              major=$((major+1)); minor=0; patch=0
+            elif [ "$bump" = "minor" ]; then
+              minor=$((minor+1)); patch=0
+            else
+              patch=$((patch+1))
+            fi
+            
+            NEW_TAG="v${major}.${minor}.${patch}"
+            VERSION_TO_USE=$NEW_TAG
+            
+            echo "New version determined: $NEW_TAG"
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git tag $NEW_TAG
             git push "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" $NEW_TAG
           else
-            echo "No new tag required"
+            echo "No new commits since last tag. Using existing version: $LAST_TAG"
           fi
+          
+          echo "version=${VERSION_TO_USE}" >> $GITHUB_OUTPUT
 
   package:
     needs: auto_tag
