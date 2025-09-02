@@ -465,7 +465,8 @@ jobs:
         # Install the REAL Crossplane CLI using the official install script
         curl -sL "https://raw.githubusercontent.com/crossplane/crossplane/main/install.sh" | sh
         sudo mv crossplane /usr/local/bin/
-        crossplane version
+        # Test CLI without connecting to cluster (just show help)
+        crossplane --help | head -5
     - name: Login to Upbound
       run: |
         echo "Logging in to Upbound with up CLI..."
@@ -627,8 +628,8 @@ jobs:
           file provider-nutanix-${VERSION}.xpkg
           echo "Full package structure:"
           tar -tf provider-nutanix-${VERSION}.xpkg
-          echo "CLI version:"
-          crossplane version
+          echo "CLI info:"
+          crossplane --help | head -3
           
           # For now, continue without failing to test the rest of the pipeline
           echo "⚠️ Continuing without package push for testing..."
