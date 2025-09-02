@@ -462,19 +462,20 @@ jobs:
         up version
     - name: Install Crossplane CLI
       run: |
-        # Install Crossplane CLI (the package management tool, not the core controller)
-        curl -sL "https://releases.crossplane.io/stable/current/bin/linux_amd64/crank" -o crank
-        chmod +x crank
-        sudo mv crank /usr/local/bin/
-        # Create symlink for both command names
-        sudo ln -sf /usr/local/bin/crank /usr/local/bin/crossplane-cli
-        crank --help | head -5
+        # Install the REAL Crossplane CLI using the official install script
+        curl -sL "https://raw.githubusercontent.com/crossplane/crossplane/main/install.sh" | sh
+        sudo mv crossplane /usr/local/bin/
+        crossplane version
     - name: Login to Upbound
       run: |
-        echo "Logging in to Upbound..."
+        echo "Logging in to Upbound with up CLI..."
         up login --username="${{ secrets.UPBOUND_ACCESS_ID }}" --password="${{ secrets.UPBOUND_TOKEN }}"
         echo "Login successful"
         up profile current
+        
+        echo "Logging in to Upbound with crossplane CLI..."
+        crossplane xpkg login --username="${{ secrets.UPBOUND_ACCESS_ID }}" --password="${{ secrets.UPBOUND_TOKEN }}"
+        echo "Crossplane CLI login successful"
       env:
         UPBOUND_ACCESS_ID: ${{ secrets.UPBOUND_ACCESS_ID }}
         UPBOUND_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
@@ -507,7 +508,7 @@ jobs:
         
         # Try using Crossplane CLI to build the package
         echo "Building package with Crossplane CLI..."
-        if crank xpkg build --package-root=package --package-file=provider-nutanix-${VERSION}.xpkg; then
+        if crossplane xpkg build --package-root=package --package-file=provider-nutanix-${VERSION}.xpkg; then
           echo "✅ Package built successfully with Crossplane CLI"
           ls -la provider-nutanix-${VERSION}.xpkg
           file provider-nutanix-${VERSION}.xpkg
@@ -605,37 +606,29 @@ jobs:
           exit 1
         fi
         
-        # Try pushing the package - use simple approach first
-        echo "=== Attempting package push ==="
+        # Use the proper crossplane xpkg push command as per documentation
+        echo "=== Attempting package push with crossplane CLI ==="
         
-        # Check if this is a working package before trying to push
-        echo "Package verification:"
-        ls -la provider-nutanix-${VERSION}.xpkg
-        echo "Package contents preview:"
-        tar -tf provider-nutanix-${VERSION}.xpkg | head -10
-        
-        # Try up CLI with a simple approach first (skip complex manifest)
-        echo "Trying direct push with up CLI..."
-        if up xpkg push xpkg.upbound.io/mgeorge67701/provider-nutanix:${VERSION} -f provider-nutanix-${VERSION}.xpkg; then
-          echo "✅ Successfully pushed version ${VERSION} with up CLI"
+        if crossplane xpkg push xpkg.upbound.io/mgeorge67701/provider-nutanix:${VERSION} -f provider-nutanix-${VERSION}.xpkg; then
+          echo "✅ Successfully pushed version ${VERSION}"
           
           # Only push as latest if this is not a pre-release
           if [[ ! "${VERSION}" =~ (alpha|beta|rc) ]]; then
             echo "Pushing as latest..."
-            if up xpkg push xpkg.upbound.io/mgeorge67701/provider-nutanix:latest -f provider-nutanix-${VERSION}.xpkg; then
+            if crossplane xpkg push xpkg.upbound.io/mgeorge67701/provider-nutanix:latest -f provider-nutanix-${VERSION}.xpkg; then
               echo "✅ Successfully pushed as latest"
             else
               echo "⚠️ Failed to push as latest, but version push succeeded"
             fi
           fi
         else
-          echo "❌ Package push failed with up CLI"
+          echo "❌ Package push failed"
           echo "Package details:"
           file provider-nutanix-${VERSION}.xpkg
           echo "Full package structure:"
           tar -tf provider-nutanix-${VERSION}.xpkg
           echo "CLI version:"
-          up version
+          crossplane version
           
           # For now, continue without failing to test the rest of the pipeline
           echo "⚠️ Continuing without package push for testing..."
