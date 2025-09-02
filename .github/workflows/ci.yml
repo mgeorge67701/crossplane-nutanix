@@ -167,7 +167,7 @@ jobs:
           UPBOUND_ACCESS_ID: ${{ secrets.UPBOUND_ACCESS_ID }}
           UPBOUND_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
         run: |
-          echo "$UPBOUND_TOKEN" | docker login xpkg.upbound.io 
+          echo "$UPBOUND_TOKEN" | docker login xpkg.upbound.io -u "$UPBOUND_ACCESS_ID" --password-stdin
       - name: Push package to registry
         run: |
           crossplane xpkg push -f provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg xpkg.upbound.io/mgeorge67701/provider-nutanix:${{ needs.auto_tag.outputs.version }}
