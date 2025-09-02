@@ -2,12 +2,12 @@ name: Crossplane Provider CI/CD
 
 on:
   push:
-    branches: [ main, develop ]
-    tags: [ 'v*' ]
+    branches: [main, develop]
+    tags: ['v*']
   pull_request:
-    branches: [ main ]
+    branches: [main]
   release:
-    types: [ published ]
+    types: [published]
 
 permissions:
   contents: write
@@ -19,627 +19,207 @@ jobs:
   debug:
     runs-on: ubuntu-latest
     steps:
-    - name: Debug event information
-      run: |
-        echo "Event name: ${{ github.event_name }}"
-        echo "Ref: ${{ github.ref }}"
-        echo "Ref type: ${{ github.ref_type }}"
-        echo "Tag: ${{ github.ref_name }}"
-        echo "Event action: ${{ github.event.action }}"
+      - name: Debug event information
+        run: |
+          echo "Event name: ${{ github.event_name }}"
+          echo "Ref: ${{ github.ref }}"
+          echo "Ref type: ${{ github.ref_type }}"
+          echo "Tag: ${{ github.ref_name }}"
+          echo "Event action: ${{ github.event.action }}"
 
   test:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
-    - name: Set up Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: '1.24'
-        cache: true
-        cache-dependency-path: 'go.sum'
-    - name: Download dependencies
-      run: |
-        go clean -modcache || true
-        go mod download
-      env:
-        GOPROXY: https://proxy.golang.org,direct
-    - name: Run tests
-      run: go test -v ./...
-      env:
-        CGO_ENABLED: 0
-    - name: Run go vet
-      run: go vet ./...
-    - name: Install golangci-lint
-      run: |
-        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin latest
-        echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
-    - name: Run golangci-lint
-      run: golangci-lint run --timeout=10m
-    - name: Check formatting
-      run: |
-        if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
-          echo "Code is not formatted properly:"
-          gofmt -s -l .
-          exit 1
-        fi
-    - name: Generate Go code
-      run: make generate
-    - name: Check if Go code is up to date
-      run: |
-        if [ -n "$(git status --porcelain apis/)" ]; then
-          echo "Generated Go code is not up to date. Please run 'make generate' and commit the changes."
-          git status --porcelain apis/
-          exit 1
-        fi
-
-  validate-examples:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - name: Validate root examples directory
-      run: |
-        if [ -d examples ]; then
-          echo "Found examples directory with usage examples"
-          find examples/ -name "*.yaml" -o -name "*.yml" | xargs -I {} sh -c 'echo "Checking {}" && cat {} | grep -q "apiVersion" || echo "Note: {} may be documentation example"'
-          echo "✅ Examples check completed - examples available in repository"
-        else
-          echo "No examples directory found."
-        fi
-    - name: Note about package examples
-      run: |
-        echo "ℹ️  Examples are provided in the /examples directory of the repository"
-        echo "   They are not included in the package to avoid CRD validation conflicts"
-        echo "   Users can find complete examples at: https://github.com/mgeorge67701/provider-nutanix/tree/main/examples"
-
-  build:
-    runs-on: ubuntu-latest
-    needs: [test, validate-examples]
-    strategy:
-      matrix:
-        include:
-          - goos: linux
-            goarch: amd64
-          - goos: linux
-            goarch: arm64
-          - goos: darwin
-            goarch: amd64
-          - goos: darwin
-            goarch: arm64
-    steps:
-    - uses: actions/checkout@v4
-    - name: Set up Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: '1.24'
-    - name: Build Crossplane Provider
-      run: |
-        mkdir -p dist
-        GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} make build
-        BINARY_NAME="provider-nutanix_${{ matrix.goos }}_${{ matrix.goarch }}"
-        cp bin/provider dist/$BINARY_NAME
-    - name: Upload build artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: provider-binaries-${{ matrix.goos }}-${{ matrix.goarch }}
-        path: dist/provider-nutanix_${{ matrix.goos }}_${{ matrix.goarch }}*
-
-  package:
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-    - uses: actions/checkout@v4
-    - name: Set up Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: '1.24'
-    - name: Install Crossplane CLI
-      run: |
-        curl -sL https://releases.crossplane.io/stable/current/bin/linux_amd64/crank -o crank
-        chmod +x crank
-        sudo mv crank /usr/local/bin/
-    - name: Prepare package directory
-      run: |
-        make copy-provider
-        find package/ -name "*.tmp" -delete || true
-        find package/ -name "*.bak" -delete || true
-        find package/ -name "*.backup" -delete || true
-        rm -f package/README.md
-        rm -rf package/examples
-    - name: Sync README.md to crossplane.yaml annotation
-      run: bash scripts/sync-readme.sh
-    - name: Build Crossplane package
-      run: |
-        VERSION=${GITHUB_REF_NAME:-$(git rev-parse --short HEAD)}
-        echo "Building package version: $VERSION"
-        
-        # Create manifest.json manually for Upbound compatibility
-        cat > package/manifest.json << 'EOF'
-        {
-          "apiVersion": "meta.pkg.crossplane.io/v1",
-          "kind": "Provider",
-          "metadata": {
-            "name": "provider-nutanix"
-          }
-        }
-        EOF
-        
-        # Use manual tar creation with manifest.json included
-        tar -cf provider-nutanix-${VERSION}.xpkg -C package .
-        echo "Package created successfully"
-        ls -la provider-nutanix-${VERSION}.xpkg
-        file provider-nutanix-${VERSION}.xpkg
-        
-        # Verify package contents (should include manifest.json)
-        echo "Package contents:"
-        tar -tf provider-nutanix-${VERSION}.xpkg | head -10
-    - name: Upload package artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: crossplane-package
-        path: provider-nutanix-*.xpkg
-
-  release:
-    if: (github.event_name == 'release' || startsWith(github.ref, 'refs/tags/')) || (github.ref == 'refs/heads/main' && github.event_name == 'push')
-    runs-on: ubuntu-latest
-    needs: [auto-tag]
-    steps:
-    - uses: actions/checkout@v4
-    - name: Set up Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: '1.24'
-    - name: Get version
-      id: version
-      run: |
-        if [ "${{ needs.auto-tag.outputs.version }}" != "" ]; then
-          # Use version from auto-tag job
-          VERSION="${{ needs.auto-tag.outputs.version }}"
-          VERSION=${VERSION#v}  # Remove 'v' prefix
-        else
-          # Use version from tag (for manual tag pushes)
-          VERSION=${GITHUB_REF_NAME#v}
-        fi
-        echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
-        echo "Using version: $VERSION"
-    - name: Build all platforms
-      run: |
-        VERSION="${{ steps.version.outputs.VERSION }}"
-        mkdir -p dist
-        GOOS=linux GOARCH=amd64 make build
-        cp bin/provider dist/provider-nutanix_linux_amd64
-        GOOS=linux GOARCH=arm64 make build
-        cp bin/provider dist/provider-nutanix_linux_arm64
-        GOOS=darwin GOARCH=amd64 make build
-        cp bin/provider dist/provider-nutanix_darwin_amd64
-        GOOS=darwin GOARCH=arm64 make build
-        cp bin/provider dist/provider-nutanix_darwin_arm64
-    - name: Install Crossplane CLI
-      run: |
-        curl -sL https://releases.crossplane.io/stable/current/bin/linux_amd64/crank -o crank
-        chmod +x crank
-        sudo mv crank /usr/local/bin/
-    - name: Build Crossplane package
-      run: |
-        VERSION="${{ steps.version.outputs.VERSION }}"
-        # Build Linux/amd64 binary for the package
-        make copy-provider
-        find package/ -name "*.tmp" -delete || true
-        find package/ -name "*.bak" -delete || true
-        find package/ -name "*.backup" -delete || true
-        rm -f package/README.md
-        rm -rf package/examples
-        
-        echo "--- Content of package/crossplane.yaml BEFORE sync ---"
-        cat package/crossplane.yaml
-        echo "--- Content of README.md ---"
-        cat README.md
-        bash scripts/sync-readme.sh # Added: Sync README.md to crossplane.yaml annotation
-        echo "--- Content of package/crossplane.yaml AFTER sync ---"
-        cat package/crossplane.yaml
-        
-        echo "Building package version: $VERSION"
-        
-        # Create manifest.json manually for Upbound compatibility
-        echo '{
-          "apiVersion": "meta.pkg.crossplane.io/v1",
-          "kind": "Provider",
-          "metadata": {
-            "name": "provider-nutanix"
-          }
-        }' > package/manifest.json
-        
-        # Use manual tar creation without compression for Upbound compatibility
-        tar -cf provider-nutanix-${VERSION}.xpkg -C package .
-        echo "Package created successfully"
-        ls -la provider-nutanix-${VERSION}.xpkg
-        file provider-nutanix-${VERSION}.xpkg
-        cp provider-nutanix-${VERSION}.xpkg dist/
-    - name: Prepare release assets
-      run: |
-        cd dist
-        for file in provider-nutanix_*; do
-          if [[ "$file" != *.xpkg ]]; then
-            tar -czf "$file.tar.gz" "$file"
-            rm "$file"
-          fi
-        done
-        sha256sum *.{tar.gz,xpkg} > provider-nutanix_SHA256SUMS
-        ls -la
-    - name: Upload Release Assets
-      if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'release'
-      uses: softprops/action-gh-release@v1
-      with:
-        tag_name: ${{ needs.auto-tag.outputs.version || github.ref_name }}
-        name: Release ${{ needs.auto-tag.outputs.version || github.ref_name }}
-        files: |
-          dist/*.tar.gz
-          dist/*.xpkg
-          dist/provider-nutanix_SHA256SUMS
-        generate_release_notes: true
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    - name: Create GitHub Release for auto-tagged version
-      if: github.ref == 'refs/heads/main' && needs.auto-tag.outputs.version != ''
-      uses: softprops/action-gh-release@v1
-      with:
-        tag_name: ${{ needs.auto-tag.outputs.version }}
-        name: Release ${{ needs.auto-tag.outputs.version }}
-        files: |
-          dist/*.tar.gz
-          dist/*.xpkg
-          dist/provider-nutanix_SHA256SUMS
-        generate_release_notes: true
-        body: |
-          This release was automatically created after successful package build and testing.
-          
-          ## Changes
-          Auto-generated from commits since last release.
-          
-          ## Installation
-          ```bash
-          kubectl apply -f - <<EOF
-          apiVersion: pkg.crossplane.io/v1
-          kind: Provider
-          metadata:
-            name: provider-nutanix
-          spec:
-            package: xpkg.upbound.io/mgeorge67701/provider-nutanix:${{ steps.version.outputs.VERSION }}
-          EOF
-          ```
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+          cache-dependency-path: 'go.sum'
+      - name: Download dependencies
+        run: |
+          go clean -modcache || true
+          go mod download
+        env:
+          GOPROXY: https://proxy.golang.org,direct
+      - name: Run tests
+        run: go test -v ./...
+        env:
+          CGO_ENABLED: 0
+      - name: Run go vet
+        run: go vet ./...
 
   auto-tag:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
-    needs: package
+    needs: test
     outputs:
       version: ${{ steps.version.outputs.version }}
       version_created: ${{ steps.should_tag.outputs.should_tag }}
     steps:
-    - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-        token: ${{ secrets.GITHUB_TOKEN }}
-    - name: Configure Git
-      run: |
-        git config user.name "github-actions[bot]"
-        git config user.email "github-actions[bot]@users.noreply.github.com"
-    - name: Check if auto-tag should be created
-      id: should_tag
-      run: |
-        # Check if the last commit message indicates this is an auto-generated commit
-        LAST_COMMIT_MSG=$(git log -1 --pretty=%B)
-        echo "Last commit message: $LAST_COMMIT_MSG"
-        
-        # Skip if this commit is from a previous auto-tag or version bump
-        if echo "$LAST_COMMIT_MSG" | grep -q "Auto-generated release\|Bump version\|Release v"; then
-          echo "Skipping auto-tag: commit appears to be auto-generated"
-          echo "should_tag=false" >> $GITHUB_OUTPUT
-          exit 0
-        fi
-        
-        # Check if there have been any substantial changes since last tag
-        LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-        if [[ -n "$LATEST_TAG" ]]; then
-          COMMITS_SINCE_TAG=$(git rev-list "${LATEST_TAG}..HEAD" --count)
-          echo "Commits since $LATEST_TAG: $COMMITS_SINCE_TAG"
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - name: Determine version bump
+        id: version
+        run: |
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v1.0.0")
+          echo "Latest tag: $LATEST_TAG"
           
-          if [[ "$COMMITS_SINCE_TAG" -eq 0 ]]; then
-            echo "No commits since last tag, skipping auto-tag"
-            echo "should_tag=false" >> $GITHUB_OUTPUT
-            exit 0
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          echo "Commit message: $COMMIT_MSG"
+          
+          # Parse semantic version
+          if [[ $LATEST_TAG =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+) ]]; then
+            MAJOR=${BASH_REMATCH[1]}
+            MINOR=${BASH_REMATCH[2]}
+            PATCH=${BASH_REMATCH[3]}
+          else
+            MAJOR=1
+            MINOR=0
+            PATCH=0
           fi
-        fi
-        
-        echo "Conditions met for auto-tag creation"
-        echo "should_tag=true" >> $GITHUB_OUTPUT
-    - name: Get next version
-      if: steps.should_tag.outputs.should_tag == 'true'
-      id: version
-      run: |
-        # Get the latest tag
-        LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v1.0.0")
-        echo "Latest tag: $LATEST_TAG"
-        
-        # Extract version numbers (remove 'v' prefix)
-        VERSION=${LATEST_TAG#v}
-        IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
-        
-        # Determine version bump type based on commit messages
-        COMMITS_SINCE_TAG=$(git log "${LATEST_TAG}..HEAD" --oneline)
-        echo "Commits since last tag:"
-        echo "$COMMITS_SINCE_TAG"
-        
-        # Check for breaking changes or major features
-        if echo "$COMMITS_SINCE_TAG" | grep -iq "BREAKING\|breaking change\|major:"; then
-          NEW_MAJOR=$((MAJOR + 1))
-          NEW_VERSION="v${NEW_MAJOR}.0.0"
-          echo "Detected breaking changes, bumping major version"
-        elif echo "$COMMITS_SINCE_TAG" | grep -iq "feat:\|feature:\|minor:"; then
-          NEW_MINOR=$((MINOR + 1))
-          NEW_VERSION="v${MAJOR}.${NEW_MINOR}.0"
-          echo "Detected new features, bumping minor version"
-        else
-          # Default to patch bump
-          NEW_PATCH=$((PATCH + 1))
-          NEW_VERSION="v${MAJOR}.${MINOR}.${NEW_PATCH}"
-          echo "Default patch version bump"
-        fi
-        
-        echo "Next version: $NEW_VERSION"
-        echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
-        echo "version_created=true" >> $GITHUB_OUTPUT
-    - name: Create and push tag
-      if: steps.should_tag.outputs.should_tag == 'true'
-      run: |
-        NEW_VERSION="${{ steps.version.outputs.version }}"
-        echo "Creating tag: $NEW_VERSION"
-        
-        # Check if tag already exists
-        if git rev-parse "$NEW_VERSION" >/dev/null 2>&1; then
-          echo "Tag $NEW_VERSION already exists, skipping..."
-          exit 0
-        fi
-        
-        # Get commit messages for tag annotation
-        LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-        if [[ -n "$LATEST_TAG" ]]; then
-          COMMIT_MESSAGES=$(git log --oneline "${LATEST_TAG}..HEAD" | sed 's/^/- /')
-        else
-          COMMIT_MESSAGES="- Initial release"
-        fi
-        
-        # Create tag with commit message
-        git tag -a "$NEW_VERSION" -m "Auto-generated release $NEW_VERSION - Package build completed successfully"
-        
-        # Push the tag
-        git push origin "$NEW_VERSION"
-        echo "Successfully created and pushed tag: $NEW_VERSION"
-        
-        # The tag push will trigger a new workflow run with the tag context
-        # which will then execute the release and publish-to-upbound jobs
-        echo "Tag $NEW_VERSION pushed - this will trigger a separate release workflow run"
-        
-        # Add a summary for the GitHub Actions run
-        echo "## 🚀 Auto-Release Created" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "**Version:** $NEW_VERSION" >> $GITHUB_STEP_SUMMARY
-        echo "**Trigger:** Successful package build on main branch" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "The release pipeline will now automatically start to publish this version to Upbound Marketplace." >> $GITHUB_STEP_SUMMARY
+          
+          # Determine version bump
+          if echo "$COMMIT_MSG" | grep -qE "^BREAKING|^feat!|^fix!"; then
+            MAJOR=$((MAJOR + 1))
+            MINOR=0
+            PATCH=0
+          elif echo "$COMMIT_MSG" | grep -qE "^feat"; then
+            MINOR=$((MINOR + 1))
+            PATCH=0
+          else
+            PATCH=$((PATCH + 1))
+          fi
+          
+          NEW_VERSION="v${MAJOR}.${MINOR}.${PATCH}"
+          echo "New version: $NEW_VERSION"
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+      - name: Create and push tag
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          echo "Creating tag: $VERSION"
+          git tag "$VERSION"
+          git push origin "$VERSION"
+          echo "Tag $VERSION created and pushed"
 
-  publish-to-upbound:
-    if: (github.event_name == 'release' || startsWith(github.ref, 'refs/tags/')) || (github.ref == 'refs/heads/main' && github.event_name == 'push')
+  package:
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
-    needs: [release, auto-tag]
+    needs: [test]
     steps:
-    - uses: actions/checkout@v4
-    - name: Set up Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: '1.24'
-    - name: Get version
-      id: version
-      run: |
-        if [ "${{ needs.auto-tag.outputs.version }}" != "" ]; then
-          # Use version from auto-tag job
-          VERSION="${{ needs.auto-tag.outputs.version }}"
-          VERSION=${VERSION#v}  # Remove 'v' prefix
-        else
-          # Use version from tag (for manual tag pushes)
-          VERSION=${GITHUB_REF_NAME#v}
-        fi
-        echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
-        echo "Using version: $VERSION"
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-    - name: Install Upbound CLI
-      run: |
-        # Install latest Upbound CLI
-        curl -sL https://cli.upbound.io | sh
-        sudo mv up /usr/local/bin/
-        up version
-    - name: Install Crossplane CLI
-      run: |
-        # Install the REAL Crossplane CLI using the official install script
-        curl -sL "https://raw.githubusercontent.com/crossplane/crossplane/main/install.sh" | sh
-        sudo mv crossplane /usr/local/bin/
-        # Test CLI without connecting to cluster (just show help)
-        crossplane --help | head -5
-    - name: Login to Upbound
-      run: |
-        echo "Logging in to Upbound with up CLI..."
-        up login --username="${{ secrets.UPBOUND_ACCESS_ID }}" --password="${{ secrets.UPBOUND_TOKEN }}"
-        echo "Login successful"
-        up profile current
-        
-        echo "Logging in to Upbound with crossplane CLI..."
-        crossplane xpkg login --username="${{ secrets.UPBOUND_ACCESS_ID }}" --password="${{ secrets.UPBOUND_TOKEN }}"
-        echo "Crossplane CLI login successful"
-      env:
-        UPBOUND_ACCESS_ID: ${{ secrets.UPBOUND_ACCESS_ID }}
-        UPBOUND_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
-    - name: Build and push Docker image to GitHub Container Registry
-      run: |
-        VERSION="${{ steps.version.outputs.VERSION }}"
-        echo "Building multi-platform Docker image version: $VERSION"
-        echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
-        docker buildx create --use --name multi-platform-builder
-        docker buildx build \
-          --platform linux/amd64,linux/arm64 \
-          --tag ghcr.io/mgeorge67701/provider-nutanix:${VERSION} \
-          --tag ghcr.io/mgeorge67701/provider-nutanix:latest \
-          --push \
-          .
-        echo "Multi-platform Docker image pushed: ghcr.io/mgeorge67701/provider-nutanix:${VERSION}"
-    - name: Build Crossplane package
-      run: |
-        VERSION="${{ steps.version.outputs.VERSION }}"
-        make copy-provider
-        find package/ -name "*.tmp" -delete || true
-        find package/ -name "*.bak" -delete || true
-        find package/ -name "*.backup" -delete || true
-        rm -f package/README.md
-        rm -rf package/examples
-        
-        echo "Building package version: $VERSION"
-        echo "Package will be built as: provider-nutanix-${VERSION}.xpkg"
-        sed -i "s|image:.*|image: ghcr.io/mgeorge67701/provider-nutanix:${VERSION}|" package/crossplane.yaml
-        
-        # Try using Crossplane CLI to build the package
-        echo "Building package with Crossplane CLI..."
-        # Ensure we use clean CRD files from config directory to avoid YAML parsing errors
-        echo "Copying clean CRD files from config directory..."
-        cp config/crd/nutanix.crossplane.io_virtualmachines.yaml package/
-        cp config/crd/nutanix.crossplane.io_providerconfigs.yaml package/
-        if crossplane xpkg build --package-root=package --package-file=provider-nutanix-${VERSION}.xpkg; then
-          echo "✅ Package built successfully with Crossplane CLI"
-          ls -la provider-nutanix-${VERSION}.xpkg
-          file provider-nutanix-${VERSION}.xpkg
-          echo "Package size: $(du -h provider-nutanix-${VERSION}.xpkg)"
-          
-          # Verify package contents
-          echo "=== Package contents ==="
-          tar -tzf provider-nutanix-${VERSION}.xpkg
-        else
-          echo "❌ Crossplane CLI build failed - will create minimal package"
-          
-          # Skip the problematic providerconfigs CRD and create a working package
-          echo "Creating package with only working components..."
-          
-          # Create minimal package with just the essential files
-          mkdir -p minimal_package
-          cp package/crossplane.yaml minimal_package/
-          cp package/provider minimal_package/
-          cp package/icon.svg minimal_package/
-          
-          # Test and include virtualmachines CRD if it's valid
-          if [ -f package/nutanix.crossplane.io_virtualmachines.yaml ]; then
-            echo "Including VirtualMachines CRD..."
-            cp package/nutanix.crossplane.io_virtualmachines.yaml minimal_package/
-          fi
-          
-          echo "Minimal package contents:"
-          find minimal_package -type f
-          
-          # Create package using tar (Crossplane packages are just tar files)
-          cd minimal_package
-          tar -cf ../provider-nutanix-${VERSION}.xpkg *
-          cd ..
-          rm -rf minimal_package
-          
-          echo "Manual package created:"
-          ls -la provider-nutanix-${VERSION}.xpkg
-          file provider-nutanix-${VERSION}.xpkg
-          
-          echo "Package created manually"
-          ls -la provider-nutanix-${VERSION}.xpkg
-          file provider-nutanix-${VERSION}.xpkg
-          
-          # Verify package contents
-          echo "=== Package contents ==="
-          tar -tf provider-nutanix-${VERSION}.xpkg
-        fi
-    - name: Verify package and repository
-      run: |
-        VERSION="${{ steps.version.outputs.VERSION }}"
-        echo "Verifying package file exists..."
-        ls -la provider-nutanix-${VERSION}.xpkg
-        echo "Checking repository access..."
-        if ! up repository list | grep -q provider-nutanix; then
-          echo "Repository not found, creating it..."
-          up repository create provider-nutanix --publish
-        fi
-        echo "Current user context:"
-        up profile current
-        echo "Ready to push package: xpkg.upbound.io/mgeorge67701/provider-nutanix:${VERSION}"
-    - name: Push to Upbound Marketplace
-      run: |
-        VERSION="${{ steps.version.outputs.VERSION }}"
-        echo "Pushing package version: ${VERSION}"
-        echo "Full ref name: ${GITHUB_REF_NAME}"
-        
-        # Verify package exists and contents
-        echo "=== Pre-push verification ==="
-        ls -la provider-nutanix-${VERSION}.xpkg
-        echo "Package contents:"
-        
-        # Detect if package is compressed or not and list contents appropriately
-        if file provider-nutanix-${VERSION}.xpkg | grep -q "gzip"; then
-          echo "Package is gzip compressed"
-          tar -tzf provider-nutanix-${VERSION}.xpkg
-          PACKAGE_FILES=$(tar -tzf provider-nutanix-${VERSION}.xpkg)
-        else
-          echo "Package is uncompressed tar"  
-          tar -tf provider-nutanix-${VERSION}.xpkg
-          PACKAGE_FILES=$(tar -tf provider-nutanix-${VERSION}.xpkg)
-        fi
-        
-        # Verify essential Crossplane files exist
-        if echo "$PACKAGE_FILES" | grep -q "crossplane.yaml"; then
-          echo "✅ crossplane.yaml found in package"
-        else
-          echo "❌ crossplane.yaml missing from package"
-          exit 1
-        fi
-        
-        if echo "$PACKAGE_FILES" | grep -q "provider"; then
-          echo "✅ provider binary found in package"
-        else
-          echo "❌ provider binary missing from package"
-          exit 1
-        fi
-        
-        # Use the proper crossplane xpkg push command as per documentation
-        echo "=== Attempting package push with crossplane CLI ==="
-        
-        if crossplane xpkg push xpkg.upbound.io/mgeorge67701/provider-nutanix:${VERSION} -f provider-nutanix-${VERSION}.xpkg; then
-          echo "✅ Successfully pushed version ${VERSION}"
-          
-          # Only push as latest if this is not a pre-release
-          if [[ ! "${VERSION}" =~ (alpha|beta|rc) ]]; then
-            echo "Pushing as latest..."
-            if crossplane xpkg push xpkg.upbound.io/mgeorge67701/provider-nutanix:latest -f provider-nutanix-${VERSION}.xpkg; then
-              echo "✅ Successfully pushed as latest"
-            else
-              echo "⚠️ Failed to push as latest, but version push succeeded"
-            fi
-          fi
-        else
-          echo "❌ Package push failed"
-          echo "Package details:"
-          file provider-nutanix-${VERSION}.xpkg
-          echo "Full package structure:"
-          tar -tf provider-nutanix-${VERSION}.xpkg
-          echo "CLI info:"
-          crossplane --help | head -3
-          
-          # For now, continue without failing to test the rest of the pipeline
-          echo "⚠️ Continuing without package push for testing..."
-        fi
-    - name: Update repository publish policy
-      run: |
-        echo "Updating repository publish policy..."
-        up repository update provider-nutanix --publish --private=false || echo "Repository update failed, continuing..."
-        echo "Repository update completed"
+      - uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+      - name: Get version from tag
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION"
+      - name: Build provider binary
+        run: |
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o package/provider ./cmd/provider
+          chmod +x package/provider
+      - name: Install Crossplane CLI
+        run: |
+          curl -sL "https://raw.githubusercontent.com/crossplane/crossplane/main/install.sh" | sh
+          sudo mv crossplane /usr/local/bin/
+          crossplane --help | head -5
+      - name: Update package version
+        run: |
+          VERSION=${{ steps.version.outputs.VERSION }}
+          sed -i "s|image:.*|image: ghcr.io/mgeorge67701/provider-nutanix:${VERSION}|" package/crossplane.yaml
+      - name: Build package
+        run: |
+          echo "Building Crossplane package..."
+          crossplane xpkg build --package-root=./package --package-file=./provider-nutanix-${{ steps.version.outputs.VERSION }}.xpkg
+          ls -la provider-nutanix-${{ steps.version.outputs.VERSION }}.xpkg
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: crossplane-package
+          path: provider-nutanix-${{ steps.version.outputs.VERSION }}.xpkg
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    needs: [package]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Get version from tag
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "Publishing version: $VERSION"
+      - name: Download package artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: crossplane-package
+      - name: Install Crossplane CLI
+        run: |
+          curl -sL "https://raw.githubusercontent.com/crossplane/crossplane/main/install.sh" | sh
+          sudo mv crossplane /usr/local/bin/
+      - name: Login to Upbound
+        run: |
+          echo "Logging in to Upbound with crossplane CLI..."
+          crossplane xpkg login --username="${{ secrets.UPBOUND_ACCESS_ID }}" --password="${{ secrets.UPBOUND_TOKEN }}"
+          echo "Crossplane CLI login successful"
+      - name: Push to Upbound Marketplace
+        run: |
+          VERSION=${{ steps.version.outputs.VERSION }}
+          PACKAGE_FILE="provider-nutanix-${VERSION}.xpkg"
+          echo "Pushing $PACKAGE_FILE to Upbound Marketplace..."
+          crossplane xpkg push -f "$PACKAGE_FILE" "xpkg.upbound.io/mgeorge67701/provider-nutanix:${VERSION}"
+          echo "Package published successfully to Upbound Marketplace!"
+
+  create-release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    needs: [publish]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Get version from tag
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+      - name: Download package artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: crossplane-package
+      - name: Create GitHub Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.version.outputs.VERSION }}
+          release_name: Release ${{ steps.version.outputs.VERSION }}
+          body: |
+            ## Changes in ${{ steps.version.outputs.VERSION }}
+            
+            This release includes automated package publishing to Upbound Marketplace.
+            
+            ### Package Details
+            - **Registry**: xpkg.upbound.io/mgeorge67701/provider-nutanix:${{ steps.version.outputs.VERSION }}
+            - **Marketplace**: https://marketplace.upbound.io/providers/mgeorge67701/provider-nutanix
+          draft: false
+          prerelease: false
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./provider-nutanix-${{ steps.version.outputs.VERSION }}.xpkg
+          asset_name: provider-nutanix-${{ steps.version.outputs.VERSION }}.xpkg
+          asset_content_type: application/octet-stream
