@@ -248,7 +248,7 @@ jobs:
           }
         }' > package/manifest.json
         
-        # Use manual tar creation with manifest.json included
+        # Use manual tar creation without compression for Upbound compatibility
         tar -cf provider-nutanix-${VERSION}.xpkg -C package .
         echo "Package created successfully"
         ls -la provider-nutanix-${VERSION}.xpkg
@@ -503,10 +503,8 @@ jobs:
         
         # Try using Crossplane CLI to build the package (should automatically create manifest.json)
         echo "Building package with Crossplane CLI..."
-        cd package
-        if crank xpkg build --package-file=../provider-nutanix-${VERSION}.xpkg .; then
+        if crank xpkg build --package-root=package --package-file=provider-nutanix-${VERSION}.xpkg; then
           echo "✅ Package built successfully with Crossplane CLI"
-          cd ..
           ls -la provider-nutanix-${VERSION}.xpkg
           file provider-nutanix-${VERSION}.xpkg
           echo "Package size: $(du -h provider-nutanix-${VERSION}.xpkg)"
@@ -516,9 +514,8 @@ jobs:
           tar -tzf provider-nutanix-${VERSION}.xpkg
         else
           echo "❌ Crossplane CLI build failed, falling back to manual approach"
-          cd ..
           
-          # Create manifest.json manually
+          # Create manifest.json manually with proper format
           echo '{
             "apiVersion": "meta.pkg.crossplane.io/v1",
             "kind": "Provider",
@@ -527,15 +524,15 @@ jobs:
             }
           }' > package/manifest.json
           
-          # Use manual tar creation
-          tar -czf provider-nutanix-${VERSION}.xpkg -C package .
+          # Use manual tar creation WITHOUT compression for Upbound compatibility
+          tar -cf provider-nutanix-${VERSION}.xpkg -C package .
           echo "Package created manually"
           ls -la provider-nutanix-${VERSION}.xpkg
           file provider-nutanix-${VERSION}.xpkg
           
           # Verify package contents
           echo "=== Package contents ==="
-          tar -tzf provider-nutanix-${VERSION}.xpkg
+          tar -tf provider-nutanix-${VERSION}.xpkg
         fi
     - name: Verify package and repository
       run: |
@@ -560,56 +557,57 @@ jobs:
         echo "=== Pre-push verification ==="
         ls -la provider-nutanix-${VERSION}.xpkg
         echo "Package contents:"
-        tar -tzf provider-nutanix-${VERSION}.xpkg | head -10
         
-        # Extract and verify manifest.json before push
-        if tar -tzf provider-nutanix-${VERSION}.xpkg | grep -q "manifest.json"; then
-          echo "✅ manifest.json confirmed in package"
-          echo "Manifest content:"
-          tar -xzf provider-nutanix-${VERSION}.xpkg manifest.json -O | head -20
-        else
-          echo "❌ manifest.json missing from package - this will cause push to fail"
-          exit 1
-        fi
-        
-        # Try multiple push approaches
-        echo "=== Attempting package push ==="
-        
-        # Method 1: Standard push
-        if up xpkg push xpkg.upbound.io/mgeorge67701/provider-nutanix:${VERSION} -f provider-nutanix-${VERSION}.xpkg; then
-          echo "✅ Successfully pushed version ${VERSION} (method 1)"
-          SUCCESS=true
-        else
-          echo "❌ Method 1 failed, trying alternative approach..."
-          SUCCESS=false
-          
-          # Method 2: Extract and repack with different compression
-          echo "Trying repack with different compression..."
-          mkdir -p /tmp/package-repack
-          tar -xzf provider-nutanix-${VERSION}.xpkg -C /tmp/package-repack
-          cd /tmp/package-repack
-          tar -cf ../provider-nutanix-${VERSION}-alt.xpkg .
-          cd -
-          
-          if up xpkg push xpkg.upbound.io/mgeorge67701/provider-nutanix:${VERSION} -f /tmp/provider-nutanix-${VERSION}-alt.xpkg; then
-            echo "✅ Successfully pushed version ${VERSION} (method 2)"
-            SUCCESS=true
+        # Detect if package is compressed or not and list contents appropriately
+        if file provider-nutanix-${VERSION}.xpkg | grep -q "gzip"; then
+          echo "Package is gzip compressed"
+          tar -tzf provider-nutanix-${VERSION}.xpkg | head -10
+          # Extract and verify manifest.json
+          if tar -tzf provider-nutanix-${VERSION}.xpkg | grep -q "manifest.json"; then
+            echo "✅ manifest.json confirmed in package"
+            echo "Manifest content:"
+            tar -xzf provider-nutanix-${VERSION}.xpkg manifest.json -O 2>/dev/null || echo "Could not extract manifest.json"
           else
-            echo "❌ Method 2 also failed"
-            SUCCESS=false
+            echo "❌ manifest.json missing from package"
+          fi
+        else
+          echo "Package is uncompressed tar"
+          tar -tf provider-nutanix-${VERSION}.xpkg | head -10
+          # Extract and verify manifest.json
+          if tar -tf provider-nutanix-${VERSION}.xpkg | grep -q "manifest.json"; then
+            echo "✅ manifest.json confirmed in package"
+            echo "Manifest content:"
+            tar -xf provider-nutanix-${VERSION}.xpkg manifest.json -O 2>/dev/null || echo "Could not extract manifest.json"
+          else
+            echo "❌ manifest.json missing from package - this will cause push to fail"
+            exit 1
           fi
         fi
         
-        if [ "$SUCCESS" = "true" ]; then
+        # Try pushing the package
+        echo "=== Attempting package push ==="
+        
+        if up xpkg push xpkg.upbound.io/mgeorge67701/provider-nutanix:${VERSION} -f provider-nutanix-${VERSION}.xpkg; then
+          echo "✅ Successfully pushed version ${VERSION}"
+          
           # Only push as latest if this is not a pre-release
           if [[ ! "${VERSION}" =~ (alpha|beta|rc) ]]; then
             echo "Pushing as latest..."
-            up xpkg push xpkg.upbound.io/mgeorge67701/provider-nutanix:latest -f provider-nutanix-${VERSION}.xpkg || echo "Failed to push as latest, but version push succeeded"
-            echo "Successfully pushed as latest"
+            if up xpkg push xpkg.upbound.io/mgeorge67701/provider-nutanix:latest -f provider-nutanix-${VERSION}.xpkg; then
+              echo "✅ Successfully pushed as latest"
+            else
+              echo "⚠️ Failed to push as latest, but version push succeeded"
+            fi
           fi
         else
-          echo "All push methods failed. Package details:"
+          echo "❌ Push failed. Package details:"
           file provider-nutanix-${VERSION}.xpkg
+          echo "Package structure:"
+          if file provider-nutanix-${VERSION}.xpkg | grep -q "gzip"; then
+            tar -tzf provider-nutanix-${VERSION}.xpkg
+          else
+            tar -tf provider-nutanix-${VERSION}.xpkg
+          fi
           echo "Upbound CLI version:"
           up version
           exit 1
