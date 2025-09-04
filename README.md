@@ -290,6 +290,19 @@ spec:
   datacenter: "dc-beta"  # Uses pc-beta.example.com and specific credentials
 ```
 
+## Architecture Diagram
+
+
+Below is the architecture of the Crossplane Nutanix Provider:
+
+<p align="center">
+  <img src="package/architecture.png" alt="Architecture Diagram" width="700">
+</p>
+
+This diagram shows how Crossplane, your custom Nutanix provider controller, and Kubernetes resources interact to provision Nutanix VMs. The controller reads custom resources and network details, validates and resolves them, and provisions VMs via Nutanix Prism Central APIs.
+
+---
+
 ## Development
 
 ### Prerequisites
