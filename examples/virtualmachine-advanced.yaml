@@ -9,7 +9,7 @@ spec:
   clusterName: "aza-ntnx-01"
   datacenter: "dc-beta" # Specify the datacenter for Prism Central endpoint selection
   imageName: "rhel8" # Example: partial image name, provider selects latest RHEL 8
-  subnetName: "my-network-subnet"
+  network: "my-network-subnet"
   lob: "SECURITY" # Example: another valid LoB from ProviderConfig
   additionalDisks:
     - deviceIndex: 1

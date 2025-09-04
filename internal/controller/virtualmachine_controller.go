@@ -10,6 +10,8 @@ import (
 	"os"
 	"strings"
 
+ "gopkg.in/yaml.v2"
+
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/mgeorge67701/crossplane-nutanix/apis/v1alpha1"
 	"github.com/mgeorge67701/crossplane-nutanix/apis/v1beta1"
@@ -320,55 +322,65 @@ func (r *VirtualMachineReconciler) Reconcile(ctx context.Context, req reconcile.
 		vm.Spec.ImageUUID = latestImage.UUID
 	}
 
-	// If SubnetUUID is not set but SubnetName is, resolve the latest matching subnet
-	if vm.Spec.SubnetUUID == "" && vm.Spec.SubnetName != "" {
-		subnets, err := ntxCli.ListSubnets(ctx)
-		if err != nil {
-			r.log.Debug("Failed to list subnets", "error", err)
-			return reconcile.Result{}, err
+	// If SubnetUUID is not set but Network is specified, fetch network details from ConfigMap
+	if vm.Spec.SubnetUUID == "" && vm.Spec.Network != "" {
+		networkConfigMap := &corev1.ConfigMap{}
+		if err := r.Get(ctx, client.ObjectKey{Namespace: req.Namespace, Name: vm.Spec.Network}, networkConfigMap); err != nil {
+			r.log.Debug("Failed to fetch network ConfigMap", "name", vm.Spec.Network, "error", err)
+			return reconcile.Result{}, fmt.Errorf("failed to fetch network ConfigMap '%s': %v", vm.Spec.Network, err)
 		}
-		var latestSubnet *nutanix.SubnetInfo
-		for _, sn := range subnets {
-			if sn.Name != "" && vm.Spec.SubnetName != "" && containsIgnoreCase(sn.Name, vm.Spec.SubnetName) {
-				if latestSubnet == nil || sn.CreatedTime > latestSubnet.CreatedTime {
-					latestSubnet = &sn
-				}
+		networkDetails := make(map[string]interface{})
+		for k, v := range networkConfigMap.Data {
+			if k == "allowed_repos" {
+				var allowedRepos []string
+				_ = yaml.Unmarshal([]byte(v), &allowedRepos)
+				networkDetails[k] = allowedRepos
+			} else {
+				networkDetails[k] = v
 			}
 		}
-		if latestSubnet == nil {
-			r.log.Debug("No matching subnet found for partial name", "subnetName", vm.Spec.SubnetName)
-			return reconcile.Result{}, fmt.Errorf("no subnet found matching name: %s", vm.Spec.SubnetName)
-		}
-
-		// Enforce allowed_repos restriction from subnet JSON file
-		// Use label 'repo' on the VM as the repo identifier
-		repoName := ""
-		if val, ok := vm.Labels["repo"]; ok {
-			repoName = val
-		}
-		details, err := readDetailsByName("network", latestSubnet.Name)
-		if err == nil {
-			if allowed, ok := details["allowed_repos"]; ok {
-				if allowedList, ok := allowed.([]interface{}); ok {
-					if len(allowedList) > 0 {
-						repoAllowed := false
-						if repoName != "" {
-							for _, v := range allowedList {
-								if s, ok := v.(string); ok && s == repoName {
-									repoAllowed = true
-									break
-								}
-							}
-						}
-						if !repoAllowed {
-							return reconcile.Result{}, fmt.Errorf("repo '%s' is not allowed to use subnet '%s'", repoName, latestSubnet.Name)
-						}
-					} // else: allowed_repos is empty, allow any repo
+		// Example: use networkDetails["subnet"] for subnet name, etc.
+		// You can add logic here to use these details for VM provisioning.
+		// For example, if you want to resolve SubnetUUID by subnet name:
+		if subnetName, ok := networkDetails["subnet"].(string); ok && subnetName != "" {
+			subnets, err := ntxCli.ListSubnets(ctx)
+			if err != nil {
+				r.log.Debug("Failed to list subnets", "error", err)
+				return reconcile.Result{}, err
+			}
+			var latestSubnet *nutanix.SubnetInfo
+			for _, sn := range subnets {
+				if sn.Name != "" && containsIgnoreCase(sn.Name, subnetName) {
+					if latestSubnet == nil || sn.CreatedTime > latestSubnet.CreatedTime {
+						latestSubnet = &sn
+					}
 				}
 			}
+			if latestSubnet == nil {
+				r.log.Debug("No matching subnet found for network config", "subnet", subnetName)
+				return reconcile.Result{}, fmt.Errorf("no subnet found matching name: %s", subnetName)
+			}
+			// Enforce allowed_repos restriction from ConfigMap
+			repoName := ""
+			if val, ok := vm.Labels["repo"]; ok {
+				repoName = val
+			}
+			if allowed, ok := networkDetails["allowed_repos"].([]string); ok && len(allowed) > 0 {
+				repoAllowed := false
+				if repoName != "" {
+					for _, s := range allowed {
+						if s == repoName {
+							repoAllowed = true
+							break
+						}
+					}
+				}
+				if !repoAllowed {
+					return reconcile.Result{}, fmt.Errorf("repo '%s' is not allowed to use subnet '%s'", repoName, subnetName)
+				}
+			}
+			vm.Spec.SubnetUUID = latestSubnet.UUID
 		}
-
-		vm.Spec.SubnetUUID = latestSubnet.UUID
 	}
 
 	// If ClusterUUID is not set but ClusterName is, resolve the latest matching cluster

@@ -58,7 +58,8 @@ type VirtualMachineSpec struct {
 	SubnetUUID string `json:"subnetUuid,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	SubnetName string `json:"subnetName,omitempty"`
+	// Name of the ConfigMap containing network details for this VM
+	Network string `json:"network,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	ImageUUID string `json:"imageUuid,omitempty"`

@@ -5,6 +5,7 @@ go 1.24.0
 require (
 	github.com/alecthomas/kingpin/v2 v2.4.0
 	github.com/crossplane/crossplane-runtime v1.20.0
+	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.34.0
 	k8s.io/apimachinery v0.34.0
 	sigs.k8s.io/controller-runtime v0.22.0
