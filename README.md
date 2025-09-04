@@ -66,7 +66,7 @@ spec:
   clusterName: "my-cluster"
   datacenter: "dc-alpha"
   imageName: "ubuntu-22.04-cloud"
-  subnetName: "my-subnet"
+  network: "network-details" # References the ConfigMap named 'network-details'
   providerConfigRef:
     name: default
 ```
@@ -93,7 +93,7 @@ spec:
   clusterName: "aza-ntnx-01"  # Specify the cluster name to fetch details dynamically
   datacenter: "dc-alpha" # Specify the datacenter for Prism Central endpoint selection
   imageName: "ubuntu-22.04-cloud" # Can be a full or partial image name (e.g., "rhel8", "win2022"). The provider will dynamically resolve the image UUID from Nutanix Prism Central, selecting the latest matching image if a partial name is provided.
-  subnetName: "my-network-subnet" # The provider will dynamically resolve the subnet UUID from Nutanix Prism Central.
+  network: "network-details" # The provider will fetch network details from the ConfigMap named 'network-details'.
   lob: "CLOUD" # Must be one of the allowedLobs in ProviderConfig if mandatory
   providerConfigRef:
     name: all-features-config
@@ -118,7 +118,7 @@ spec:
   clusterName: "aza-ntnx-01"
   datacenter: "dc-beta" # Specify the datacenter for Prism Central endpoint selection
   imageName: "rhel8" # Example: partial image name, provider selects latest RHEL 8
-  subnetName: "my-network-subnet"
+  network: "network-details"
   lob: "SECURITY" # Example: another valid LoB from ProviderConfig
   additionalDisks:
     - deviceIndex: 1
