@@ -30,6 +30,8 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
+      - name: Clean Go module cache
+        run: go clean -modcache
       - name: Run unit tests
         run: go test ./...
 
@@ -109,6 +111,8 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
+        - name: Clean Go module cache
+          run: go clean -modcache
       - name: Build provider binary
         run: go build -o package/provider ./cmd/provider
       - name: Replace version placeholder
@@ -154,6 +158,8 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
+        - name: Clean Go module cache
+          run: go clean -modcache
       - name: Install Upbound CLI
         run: |
           curl -sL https://cli.upbound.io | sh
