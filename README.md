@@ -143,9 +143,7 @@ spec:
   providerConfigRef:
     name: all-features-config
 ```
-</details>
 
-<details>
 <summary><b>Advanced Virtual Machine</b></summary>
 
 **File**: `examples/virtualmachine-advanced.yaml`
