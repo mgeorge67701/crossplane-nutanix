@@ -31,9 +31,14 @@ Create a secret with your Nutanix credentials for each prism central endpoint.
 
 
 ```bash
-kubectl create secret generic nutanix-creds-default \
-  --from-literal=credentials='{"username":"admin","password":"your-password"}' \
+kubectl create secret generic nutanix-creds-alpha \
+  --from-literal=credentials='{"username":"admin-alpha","password":"alpha-password"}' \
   -n crossplane-system
+
+kubectl create secret generic nutanix-creds-beta \
+  --from-literal=credentials='{"username":"admin-beta","password":"beta-password"}' \
+  -n crossplane-system
+
 ```
 or
 
