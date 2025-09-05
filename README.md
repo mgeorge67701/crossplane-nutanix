@@ -42,7 +42,7 @@ kubectl create secret generic nutanix-creds-beta \
 ```
 or
 
-```bash
+```yaml
 apiVersion: v1
 kind: Secret
 metadata:
@@ -52,7 +52,6 @@ type: Opaque
 stringData:
   credentials: '{"username":"admin-alpha","password":"alpha-password"}'
 
-```bash
 apiVersion: v1
 kind: Secret
 metadata:
@@ -61,11 +60,12 @@ metadata:
 type: Opaque
 stringData:
   credentials: '{"username":"admin-beta","password":"beta-password"}'
-'''
+```
 
 Apply the ProviderConfig:
 
 ```yaml
+
 apiVersion: nutanix.crossplane.io/v1beta1
 kind: ProviderConfig
 metadata:
@@ -79,6 +79,22 @@ spec:
       key: credentials
   prismCentralEndpoints:
     dc-alpha: "https://pc-alpha.example.com:9440"
+    dc-beta: "https://pc-beta.example.com:9440"
+  # Define datacenter-specific credentials
+  datacenterCredentials:
+    dc-alpha:
+      source: Secret
+      secretRef:
+        namespace: crossplane-system
+        name: nutanix-creds-alpha
+        key: credentials
+    dc-beta:
+      source: Secret
+      secretRef:
+        namespace: crossplane-system
+        name: nutanix-creds-beta
+        key: credentials
+
 ```
 
 ### 3. Create a Virtual Machine
