@@ -24,15 +24,39 @@ A [Crossplane](https://crossplane.io/) provider for managing Nutanix resources. 
 kubectl apply -f https://raw.githubusercontent.com/mgeorge67701/crossplane-nutanix/main/package/crossplane.yaml
 ```
 
+
 ### 2. Create a ProviderConfig
 
-Create a secret with your Nutanix credentials:
+Create a secret with your Nutanix credentials for each prism central endpoint.
+
 
 ```bash
 kubectl create secret generic nutanix-creds-default \
   --from-literal=credentials='{"username":"admin","password":"your-password"}' \
   -n crossplane-system
 ```
+or
+
+```bash
+apiVersion: v1
+kind: Secret
+metadata:
+  name: nutanix-creds-alpha
+  namespace: crossplane-system
+type: Opaque
+stringData:
+  credentials: '{"username":"admin-alpha","password":"alpha-password"}'
+
+```bash
+apiVersion: v1
+kind: Secret
+metadata:
+  name: nutanix-creds-beta
+  namespace: crossplane-system
+type: Opaque
+stringData:
+  credentials: '{"username":"admin-beta","password":"beta-password"}'
+'''
 
 Apply the ProviderConfig:
 
