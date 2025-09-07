@@ -20,7 +20,7 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -a -ldflags '-e
 # Final stage
 FROM gcr.io/distroless/static:nonroot
 WORKDIR /
-COPY --from=builder /workspace/provider /manager
+COPY --from=builder /workspace/provider /provider
 USER 65532:65532
 
-ENTRYPOINT ["/manager"]
+ENTRYPOINT ["/provider"]
