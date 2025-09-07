@@ -95,14 +95,24 @@ jobs:
   # Go module cache step removed to prevent tar extraction errors
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build and Push Docker Image
         run: |
           # Build Docker image with the provider
-          docker build -t xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} .
-          docker tag xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:latest
+          docker build -t ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} .
+          docker tag ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} ghcr.io/${{ github.repository_owner }}/provider-nutanix:latest
           
           # Check Docker image configuration to verify ENTRYPOINT
-          docker inspect xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:latest | grep -A 5 "Entrypoint"
+          docker inspect ghcr.io/${{ github.repository_owner }}/provider-nutanix:latest | grep -A 5 "Entrypoint"
+          
+          # Push to GitHub Container Registry
+          docker push ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}
+          docker push ghcr.io/${{ github.repository_owner }}/provider-nutanix:latest
           
       - name: Replace version placeholder
         run: sed -i -e "s/VERSION_PLACEHOLDER/${{ needs.auto_tag.outputs.version }}/g" package/crossplane.yaml
@@ -143,23 +153,23 @@ jobs:
         run: |
           curl -sL https://cli.upbound.io | sh
           sudo mv up /usr/local/bin/
-      - name: Setup Docker for Upbound login
+      - name: Setup Docker for GitHub Container Registry
         uses: docker/setup-buildx-action@v2
-      - name: Login to Upbound Registry with Docker
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Push package to GitHub Container Registry
         run: |
-          # Login to Docker with Upbound Registry credentials
-          echo "${{ secrets.UPBOUND_TOKEN }}" | docker login xpkg.upbound.io -u "${{ secrets.UPBOUND_ACCESS_ID }}" --password-stdin || true
-      - name: Login to Upbound with UP CLI
-        env:
-          UPBOUND_ACCESS_ID: ${{ secrets.UPBOUND_ACCESS_ID }}
-          UPBOUND_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
-        run: |
-          up login --username="${{ secrets.UPBOUND_ACCESS_ID }}" --password="${{ secrets.UPBOUND_TOKEN }}"
-      - name: Push package to Upbound Registry
-        run: |
-          # Use up CLI to push the package
-          up xpkg push xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} -f provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg || echo "Failed with up CLI push method 1"
-          up xpkg push xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:latest -f provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg || echo "Failed with up CLI push method 2"
+          # Tag the package for GitHub Container Registry
+          up xpkg tag -f provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg ghcr.io/${{ github.repository_owner }}/provider-nutanix-package:${{ needs.auto_tag.outputs.version }}
+          up xpkg tag -f provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg ghcr.io/${{ github.repository_owner }}/provider-nutanix-package:latest
+          
+          # Push to GitHub Container Registry
+          docker push ghcr.io/${{ github.repository_owner }}/provider-nutanix-package:${{ needs.auto_tag.outputs.version }}
+          docker push ghcr.io/${{ github.repository_owner }}/provider-nutanix-package:latest
 
   create_release:
     needs: [publish, auto_tag]
