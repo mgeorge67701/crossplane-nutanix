@@ -11,4 +11,9 @@ metadata:
 spec:
   controller:
     image: xpkg.upbound.io/mgeorge67701/provider-nutanix:VERSION_PLACEHOLDER
+    args:
+      - "--debug"
+    # Set explicit command to ensure it's set in the container
+    command: 
+      - "/provider"
   icon: icon.svg
