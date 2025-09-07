@@ -10,7 +10,7 @@ metadata:
       A Crossplane provider for Nutanix
 spec:
   controller:
-    image: ghcr.io/mgeorge67701/provider-nutanix:VERSION_PLACEHOLDER
+    image: xpkg.upbound.io/mgeorge67701/provider-nutanix:VERSION_PLACEHOLDER
     args:
       - "--debug"
     command: 
