@@ -95,6 +95,10 @@ jobs:
   # Go module cache step removed to prevent tar extraction errors
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
+      - name: Install Upbound CLI
+        run: |
+          curl -sL https://cli.upbound.io | sh
+          sudo mv up /usr/local/bin/
       - name: Login to Upbound Registry
         env:
           UPBOUND_ACCESS_ID: ${{ secrets.UPBOUND_ACCESS_ID }}
