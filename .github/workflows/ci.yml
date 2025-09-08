@@ -127,25 +127,11 @@ jobs:
           docker push ghcr.io/${{ github.repository_owner }}/provider-nutanix:latest || echo "Latest tag push failed, but continuing..."
       - name: Replace version placeholder
         run: sed -i -e "s/VERSION_PLACEHOLDER/${{ needs.auto_tag.outputs.version }}/g" package/crossplane.yaml
-      - name: Build and verify .xpkg
+      - name: Build .xpkg
         run: |
-          echo "=== Package source ==="
-          cat package/crossplane.yaml
-          
-          echo "=== Building package ==="
           up xpkg build \
             --package-root=package \
             -o provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
-          
-          echo "=== Package contents ==="
-          mkdir -p /tmp/xpkg-contents
-          cd /tmp/xpkg-contents
-          tar xf $GITHUB_WORKSPACE/provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
-          find . -type f -exec echo "=== {} ===" \; -exec cat {} \;
-          cd $GITHUB_WORKSPACE
-          
-          echo "=== Package metadata ==="
-          up xpkg inspect provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
       - name: Upload .xpkg
         uses: actions/upload-artifact@v4
         with:
@@ -180,24 +166,13 @@ jobs:
           UPBOUND_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
         run: |
           up login --username="${{ secrets.UPBOUND_ACCESS_ID }}" --password="${{ secrets.UPBOUND_TOKEN }}"
-      - name: Push and verify package in Upbound Registry
+      - name: Push package to Upbound Registry
         run: |
-          echo "=== Local package info ==="
-          ls -la provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
-          
-          echo "=== Pushing versioned package ==="
           up xpkg push xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} \
             -f provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
           
-          echo "=== Pushing latest tag ==="
           up xpkg push xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:latest \
             -f provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
-          
-          echo "=== Verifying published package ==="
-          rm -rf /tmp/verify && mkdir -p /tmp/verify && cd /tmp/verify
-          up xpkg pull xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}
-          tar xf *.xpkg
-          find . -type f -exec echo "=== {} ===" \; -exec cat {} \;
 
   create_release:
     needs: [publish, auto_tag]
