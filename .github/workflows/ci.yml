@@ -129,8 +129,6 @@ jobs:
         run: |
           curl -sL https://cli.upbound.io | sh
           sudo mv up /usr/local/bin/
-      - name: Sync README to crossplane.yaml
-        run: bash scripts/sync-readme.sh
       - name: Replace version placeholder
         run: sed -i -e "s/VERSION_PLACEHOLDER/${{ needs.auto_tag.outputs.version }}/g" package/crossplane.yaml
       - name: Build .xpkg
