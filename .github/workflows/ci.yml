@@ -130,7 +130,12 @@ jobs:
           curl -sL https://cli.upbound.io | sh
           sudo mv up /usr/local/bin/
       - name: Replace version placeholder
-        run: sed -i -e "s/VERSION_PLACEHOLDER/${{ needs.auto_tag.outputs.version }}/g" package/crossplane.yaml
+        run: |
+          echo "Before replacement:"
+          cat package/crossplane.yaml
+          sed -i -e "s/VERSION_PLACEHOLDER/${{ needs.auto_tag.outputs.version }}/g" package/crossplane.yaml
+          echo "After replacement:"
+          cat package/crossplane.yaml
       - name: Build .xpkg
         run: |
           up xpkg build --package-root=package -o provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
