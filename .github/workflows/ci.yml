@@ -1,5 +1,4 @@
 name: CI
-# Force rebuild to fix image references
 
 on:
   push:
@@ -130,19 +129,10 @@ jobs:
           curl -sL https://cli.upbound.io | sh
           sudo mv up /usr/local/bin/
       - name: Replace version placeholder
-        run: |
-          echo "Before replacement:"
-          cat package/crossplane.yaml
-          sed -i -e "s/VERSION_PLACEHOLDER/${{ needs.auto_tag.outputs.version }}/g" package/crossplane.yaml
-          echo "After replacement:"
-          cat package/crossplane.yaml
+        run: sed -i -e "s/VERSION_PLACEHOLDER/${{ needs.auto_tag.outputs.version }}/g" package/crossplane.yaml
       - name: Build .xpkg
         run: |
           up xpkg build --package-root=package -o provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
-          echo "Built package, checking if it's correct..."
-          echo "File size and type:"
-          ls -lh provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
-          file provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
       - name: Upload .xpkg
         uses: actions/upload-artifact@v4
         with:
