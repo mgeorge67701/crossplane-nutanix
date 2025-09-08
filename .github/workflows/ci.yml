@@ -115,19 +115,16 @@ jobs:
         run: |
           # Build Docker image with the provider
           docker build -t ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} .
-          docker tag ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} ghcr.io/${{ github.repository_owner }}/provider-nutanix:latest
           
           # Check Docker image configuration to verify ENTRYPOINT
-          docker inspect ghcr.io/${{ github.repository_owner }}/provider-nutanix:latest | grep -A 5 "Entrypoint"
+          docker inspect ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} | grep -A 5 "Entrypoint"
           
-          # Push Docker images to GitHub Container Registry
+          # Push Docker image to GitHub Container Registry
           docker push ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}
-          docker push ghcr.io/${{ github.repository_owner }}/provider-nutanix:latest
           
-      - name: Install Upbound CLI
-        run: |
-          curl -sL https://cli.upbound.io | sh
-          sudo mv up /usr/local/bin/
+          # Tag and push latest only if this is the main branch (with retry logic)
+          docker tag ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} ghcr.io/${{ github.repository_owner }}/provider-nutanix:latest
+          docker push ghcr.io/${{ github.repository_owner }}/provider-nutanix:latest || echo "Latest tag push failed, but continuing..."
       - name: Replace version placeholder
         run: sed -i -e "s/VERSION_PLACEHOLDER/${{ needs.auto_tag.outputs.version }}/g" package/crossplane.yaml
       - name: Build .xpkg
