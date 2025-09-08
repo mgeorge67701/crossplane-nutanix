@@ -139,12 +139,10 @@ jobs:
       - name: Build .xpkg
         run: |
           up xpkg build --package-root=package -o provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
-          echo "Extracting and checking package contents:"
-          mkdir -p /tmp/xpkg-check
-          cd /tmp/xpkg-check
-          tar -xzf $GITHUB_WORKSPACE/provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
-          echo "Package crossplane.yaml contents:"
-          cat crossplane.yaml
+          echo "Built package, checking if it's correct..."
+          echo "File size and type:"
+          ls -lh provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
+          file provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
       - name: Upload .xpkg
         uses: actions/upload-artifact@v4
         with:
