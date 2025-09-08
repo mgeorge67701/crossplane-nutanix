@@ -15,4 +15,3 @@ spec:
       - "--debug"
     command: 
       - "/provider"
-  icon: icon.svg
