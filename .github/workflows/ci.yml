@@ -132,14 +132,14 @@ jobs:
           # Print package contents before building
           cat package/crossplane.yaml
           
-          # Build package with explicit configuration
+          # Build package
           up xpkg build \
             --package-root=package \
-            --embed-runtime-image=ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} \
             -o provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
           
           # Verify package contents
-          up xpkg inspect provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
+          tar -tvf provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg || true
+          up xpkg inspect provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg || true
       - name: Upload .xpkg
         uses: actions/upload-artifact@v4
         with:
@@ -176,21 +176,18 @@ jobs:
           up login --username="${{ secrets.UPBOUND_ACCESS_ID }}" --password="${{ secrets.UPBOUND_TOKEN }}"
       - name: Push package to Upbound Registry
         run: |
-          # Verify package exists and inspect contents
+          # Verify package exists and show basic info
           ls -la provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
-          up xpkg inspect provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
+          tar -tvf provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg || true
           
-          # Push package with explicit image reference
-          echo "Pushing to Upbound registry..."
-          up xpkg push \
-            --package-image=xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} \
-            --runtime-image=ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} \
+          # Push versioned package
+          echo "Pushing versioned package to Upbound registry..."
+          up xpkg push xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} \
             -f provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
           
           # Push latest tag
-          up xpkg push \
-            --package-image=xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:latest \
-            --runtime-image=ghcr.io/${{ github.repository_owner }}/provider-nutanix:latest \
+          echo "Pushing latest tag to Upbound registry..."
+          up xpkg push xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:latest \
             -f provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
 
   create_release:
