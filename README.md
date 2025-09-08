@@ -1,8 +1,6 @@
 # Crossplane Nutanix Provider
 
-<p align="center">
-  <img src="package/icon.svg" alt="Provider Logo" width="150">
-</p>
+![Provider Logo](package/icon.svg)
 
 A [Crossplane](https://crossplane.io/) provider for managing Nutanix resources. This provider enables you to provision and manage Nutanix virtual machines directly from Kubernetes using Crossplane's declarative approach.
 
@@ -24,11 +22,9 @@ A [Crossplane](https://crossplane.io/) provider for managing Nutanix resources. 
 kubectl apply -f https://raw.githubusercontent.com/mgeorge67701/crossplane-nutanix/main/package/crossplane.yaml
 ```
 
-
 ### 2. Create a ProviderConfig
 
 Create a secret with your Nutanix credentials for each prism central endpoint.
-
 
 ```bash
 kubectl create secret generic nutanix-creds-alpha \
@@ -38,8 +34,8 @@ kubectl create secret generic nutanix-creds-alpha \
 kubectl create secret generic nutanix-creds-beta \
   --from-literal=credentials='{"username":"admin-beta","password":"beta-password"}' \
   -n crossplane-system
-
 ```
+
 or
 
 ```yaml
@@ -65,7 +61,6 @@ stringData:
 Apply the ProviderConfig:
 
 ```yaml
-
 apiVersion: nutanix.crossplane.io/v1beta1
 kind: ProviderConfig
 metadata:
@@ -94,7 +89,6 @@ spec:
         namespace: crossplane-system
         name: nutanix-creds-beta
         key: credentials
-
 ```
 
 ### 3. Create a Virtual Machine
@@ -120,8 +114,7 @@ spec:
 
 The `examples/` directory contains comprehensive examples.
 
-<details>
-<summary><b>Basic Virtual Machine</b></summary>
+### Basic Virtual Machine
 
 **File**: `examples/virtualmachine.yaml`
 **Description**: Simple VM with basic configuration.
@@ -144,7 +137,7 @@ spec:
     name: all-features-config
 ```
 
-<summary><b>Advanced Virtual Machine</b></summary>
+### Advanced Virtual Machine
 
 **File**: `examples/virtualmachine-advanced.yaml`
 **Description**: VM with additional disks and external facts.
@@ -176,10 +169,8 @@ spec:
   providerConfigRef:
     name: all-features-config
 ```
-</details>
 
-<details>
-<summary><b>Full ProviderConfig</b></summary>
+### Full ProviderConfig
 
 **File**: `examples/providerconfig-all-features.yaml`
 **Description**: Complete ProviderConfig showing all available features.
@@ -235,10 +226,8 @@ spec:
         name: nutanix-creds-beta
         key: credentials
 ```
-</details>
 
-<details>
-<summary><b>Network Details ConfigMap</b></summary>
+### Network Details ConfigMap
 
 **File**: `examples/network-details-configmap.yaml`
 **Description**: Example ConfigMap for network configuration data.
@@ -267,7 +256,6 @@ data:
       ]
     }
 ```
-</details>
 
 ## Configuration
 
@@ -335,12 +323,9 @@ spec:
 
 ## Architecture Diagram
 
-
 Below is the architecture of the Crossplane Nutanix Provider:
 
-<p align="center">
-  <img src="package/architecture.png" alt="Architecture Diagram" width="700">
-</p>
+![Architecture Diagram](package/architecture.png)
 
 This diagram shows how Crossplane, your custom Nutanix provider controller, and Kubernetes resources interact to provision Nutanix VMs. The controller reads custom resources and network details, validates and resolves them, and provisions VMs via Nutanix Prism Central APIs.
 
