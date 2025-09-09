@@ -125,13 +125,6 @@ jobs:
           # Tag and push latest only if this is the main branch (with retry logic)
           docker tag ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} ghcr.io/${{ github.repository_owner }}/provider-nutanix:latest
           docker push ghcr.io/${{ github.repository_owner }}/provider-nutanix:latest || echo "Latest tag push failed, but continuing..."
-      - name: Verify Docker image size and config
-        run: |
-          IMAGE=ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}
-          echo "Image details:"
-          docker images $IMAGE
-          echo "Image config:"
-          docker inspect $IMAGE | grep -A 10 'Entrypoint'
       - name: Replace version placeholder
         run: sed -i -e "s/VERSION_PLACEHOLDER/${{ needs.auto_tag.outputs.version }}/g" package/crossplane.yaml
       - name: Build .xpkg
