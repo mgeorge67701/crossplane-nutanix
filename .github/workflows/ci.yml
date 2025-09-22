@@ -136,6 +136,9 @@ jobs:
           up xpkg build \
             --package-root=package \
             -o provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
+        - name: Debug: List .xpkg contents
+          run: |
+            echo "Listing contents of provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg for debugging:" && tar -tf provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
       - name: Inspect .xpkg for package.yaml
         run: |
           tar -tf provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg | grep '^package.yaml$' || (echo "ERROR: package.yaml not found at root of .xpkg" && exit 1)
