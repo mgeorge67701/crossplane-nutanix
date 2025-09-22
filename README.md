@@ -1,6 +1,6 @@
 # Crossplane Nutanix Provider
 
-![Provider Logo](package/icon.svg)
+![Provider Logo](icons/icon.svg)
 
 A [Crossplane](https://crossplane.io/) provider for managing Nutanix resources. This provider enables you to provision and manage Nutanix virtual machines directly from Kubernetes using Crossplane's declarative approach.
 
@@ -325,7 +325,7 @@ spec:
 
 Below is the architecture of the Crossplane Nutanix Provider:
 
-![Architecture Diagram](package/architecture.png)
+![Architecture Diagram](icons/architecture.png)
 
 This diagram shows how Crossplane, your custom Nutanix provider controller, and Kubernetes resources interact to provision Nutanix VMs. The controller reads custom resources and network details, validates and resolves them, and provisions VMs via Nutanix Prism Central APIs.
 
