@@ -111,10 +111,8 @@ jobs:
           docker buildx build --platform linux/amd64,linux/arm64 \
             -t xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} \
             -t xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:latest \
-            --load .
+            --push .
           
-          # Check Docker image configuration to verify ENTRYPOINT (for amd64)
-          docker inspect xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:latest | grep -A 5 "Entrypoint"
           
       - name: Replace version placeholder
         run: sed -i -e "s/VERSION_PLACEHOLDER/${{ needs.auto_tag.outputs.version }}/g" package/crossplane.yaml
