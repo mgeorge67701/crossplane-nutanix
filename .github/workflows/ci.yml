@@ -16,7 +16,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.24.0'
+          go-version: '1.21'
       - name: Run go mod tidy
         run: |
           go mod tidy
@@ -28,7 +28,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.24.0'
+          go-version: '1.21'
       - name: Install golangci-lint
         run: |
           curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.54.2
@@ -43,7 +43,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.24.0'
+          go-version: '1.21'
       - name: Run tests with coverage
         run: |
           go test -coverprofile=coverage.out ./...
@@ -61,7 +61,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.24.0'
+          go-version: '1.21'
           cache: false # Disable the built-in cache to avoid tar issues
   # Go module cache step removed to prevent tar extraction errors
       - name: Run unit tests
@@ -132,7 +132,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.24.0'
+          go-version: '1.21'
           cache: false # Disable the built-in cache to avoid tar issues
   # Go module cache step removed to prevent tar extraction errors
       - name: Set up QEMU
@@ -187,7 +187,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.24.0'
+          go-version: '1.21'
           cache: false # Disable the built-in cache to avoid tar issues
   # Go module cache step removed to prevent tar extraction errors
       - name: Login to Upbound
