@@ -39,8 +39,8 @@ func TestVirtualMachineDeepCopy(t *testing.T) {
 	}
 
 	// Verify the values are copied correctly
-	if copied.Name != original.Name {
-		t.Errorf("Name not copied correctly: got %q, want %q", copied.Name, original.Name)
+	if copied.ObjectMeta.Name != original.ObjectMeta.Name {
+		t.Errorf("Name not copied correctly: got %q, want %q", copied.ObjectMeta.Name, original.ObjectMeta.Name)
 	}
 
 	if copied.Spec.NumVCPUs != original.Spec.NumVCPUs {
