@@ -113,12 +113,12 @@ jobs:
           up login --username="${{ secrets.UPBOUND_ACCESS_ID }}" --password="${{ secrets.UPBOUND_TOKEN }}"
       - name: Build provider binary
         run: |
-          CGO_ENABLED=0 go build -a -ldflags '-extldflags "-static"' -o provider ./cmd/provider
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -a -ldflags '-extldflags "-static"' -o provider ./cmd/provider
           ls -l ./provider
       - name: Build and Push Docker Image
         run: |
-          # Build Docker image with the provider
-          docker build -t ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} .
+          # Build Docker image for linux/arm64
+          docker build --platform=linux/arm64 -t ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} .
           
           # Check Docker image configuration to verify ENTRYPOINT
           docker inspect ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} | grep -A 5 "Entrypoint"
