@@ -107,11 +107,13 @@ jobs:
           up login --username="${{ secrets.UPBOUND_ACCESS_ID }}" --password="${{ secrets.UPBOUND_TOKEN }}"
       - name: Build Docker Image
         run: |
-          # Build Docker image with the provider
-          docker build -t xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} .
-          docker tag xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:latest
+          # Build multi-arch Docker image for amd64 and arm64 using Buildx
+          docker buildx build --platform linux/amd64,linux/arm64 \
+            -t xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} \
+            -t xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:latest \
+            --load .
           
-          # Check Docker image configuration to verify ENTRYPOINT
+          # Check Docker image configuration to verify ENTRYPOINT (for amd64)
           docker inspect xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:latest | grep -A 5 "Entrypoint"
           
       - name: Replace version placeholder
