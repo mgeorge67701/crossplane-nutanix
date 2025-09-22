@@ -10,15 +10,12 @@ RUN go mod download
 COPY . .
 
 # Build the binary
-RUN CGO_ENABLED=0 go build -a -ldflags '-extldflags "-static"' -o provider ./cmd/provider
+RUN CGO_ENABLED=0 go build -a -ldflags '-extldflags "-static"' -o provider ./cmd/provider && chmod +x provider
 
-FROM --platform=$TARGETPLATFORM alpine:3.19
+FROM alpine:3.19
 
 # Copy the binary from the builder stage
 COPY --from=builder /workspace/provider /provider
-
-# Make the binary executable
-RUN chmod +x /provider
 
 # Set very explicit ENTRYPOINT and CMD (fixing "no command specified" error)
 ENTRYPOINT ["/provider"]
