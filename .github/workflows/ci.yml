@@ -111,6 +111,10 @@ jobs:
           UPBOUND_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
         run: |
           up login --username="${{ secrets.UPBOUND_ACCESS_ID }}" --password="${{ secrets.UPBOUND_TOKEN }}"
+      - name: Build provider binary
+        run: |
+          CGO_ENABLED=0 go build -a -ldflags '-extldflags "-static"' -o provider ./cmd/provider
+          ls -l ./provider
       - name: Build and Push Docker Image
         run: |
           # Build Docker image with the provider
