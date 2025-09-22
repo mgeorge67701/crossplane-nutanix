@@ -18,10 +18,6 @@ spec:
         - name: provider-nutanix
           image: ghcr.io/mgeorge67701/provider-nutanix:latest
           imagePullPolicy: Always
-          command:
-            - /provider
-          args:
-            - --debug
           env:
             - name: POD_NAMESPACE
               valueFrom:
