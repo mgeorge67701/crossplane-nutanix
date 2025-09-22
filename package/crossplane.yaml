@@ -10,6 +10,5 @@ metadata:
       A Crossplane provider for Nutanix
 spec:
   controller:
-    # image: ghcr.io/mgeorge67701/provider-nutanix:VERSION_PLACEHOLDER
     image: ghcr.io/mgeorge67701/provider-nutanix:latest
     pullPolicy: Always
