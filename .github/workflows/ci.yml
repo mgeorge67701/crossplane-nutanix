@@ -1,5 +1,6 @@
 name: CI
 
+
 on:
   push:
     branches: [main]
@@ -10,6 +11,49 @@ permissions:
   packages: write
 
 jobs:
+  go_mod_tidy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.24.0'
+      - name: Run go mod tidy
+        run: |
+          go mod tidy
+          git diff --exit-code go.mod go.sum || (echo 'go.mod or go.sum changed after tidy. Please commit the changes.' && exit 1)
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.24.0'
+      - name: Install golangci-lint
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.54.2
+      - name: Run golangci-lint
+        run: |
+          golangci-lint run --timeout 5m
+
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.24.0'
+      - name: Run tests with coverage
+        run: |
+          go test -coverprofile=coverage.out ./...
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.out
   test:
     runs-on: ubuntu-latest
     steps:
@@ -19,7 +63,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.21'
+          go-version: '1.24.0'
           cache: false # Disable the built-in cache to avoid tar issues
   # Go module cache step removed to prevent tar extraction errors
       - name: Run unit tests
@@ -90,7 +134,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.21'
+          go-version: '1.24.0'
           cache: false # Disable the built-in cache to avoid tar issues
   # Go module cache step removed to prevent tar extraction errors
       - name: Set up QEMU
@@ -103,12 +147,6 @@ jobs:
         run: |
           curl -sL https://cli.upbound.io | sh
           sudo mv up /usr/local/bin/
-      - name: Login to Upbound Registry
-        uses: docker/login-action@v3
-        with:
-          registry: xpkg.upbound.io
-          username: ${{ secrets.UPBOUND_ACCESS_ID }}
-          password: ${{ secrets.UPBOUND_TOKEN }}
       - name: Build and Push Multi-Arch Docker Image
         run: |
           docker buildx build \
@@ -151,20 +189,12 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.21'
+          go-version: '1.24.0'
           cache: false # Disable the built-in cache to avoid tar issues
   # Go module cache step removed to prevent tar extraction errors
-      # Upbound CLI already installed above, no need to repeat
-      - name: Install Upbound CLI
-        run: |
-          curl -sL https://cli.upbound.io | sh
-          sudo mv up /usr/local/bin/
       - name: Login to Upbound
-        env:
-          UPBOUND_ACCESS_ID: ${{ secrets.UPBOUND_ACCESS_ID }}
-          UPBOUND_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
         run: |
-          up login --username="${{ secrets.UPBOUND_ACCESS_ID }}" --password="${{ secrets.UPBOUND_TOKEN }}"
+          up login --username "${{ secrets.UPBOUND_ACCESS_ID }}" --password "${{ secrets.UPBOUND_TOKEN }}"
       - name: Push package to Upbound Registry
         run: |
           # Use up CLI to push the package
