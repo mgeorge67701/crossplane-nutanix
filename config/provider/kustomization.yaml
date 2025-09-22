@@ -1,5 +1,2 @@
 resources:
-  - ../crd
-  - serviceaccount.yaml
-  - deployment.yaml
-  - rbac.yaml
+- ../crd

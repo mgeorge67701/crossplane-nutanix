@@ -1,4 +1,5 @@
-FROM --platform=$BUILDPLATFORM golang:1.24-alpine AS builder
+# Use Alpine for better Docker compatibility with ENTRYPOINT
+FROM golang:1.24-alpine AS builder
 
 WORKDIR /workspace
 
@@ -10,12 +11,16 @@ RUN go mod download
 COPY . .
 
 # Build the binary
-RUN CGO_ENABLED=0 go build -a -ldflags '-extldflags "-static"' -o provider ./cmd/provider && chmod +x provider
+RUN CGO_ENABLED=0 go build -a -ldflags '-extldflags "-static"' -o provider ./cmd/provider
 
+# Use a smaller base image for the final container
 FROM alpine:3.19
 
 # Copy the binary from the builder stage
 COPY --from=builder /workspace/provider /provider
+
+# Make the binary executable
+RUN chmod +x /provider
 
 # Set very explicit ENTRYPOINT and CMD (fixing "no command specified" error)
 ENTRYPOINT ["/provider"]

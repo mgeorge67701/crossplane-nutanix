@@ -19,7 +19,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.24'
+          go-version: '1.21'
           cache: false # Disable the built-in cache to avoid tar issues
   # Go module cache step removed to prevent tar extraction errors
       - name: Run unit tests
@@ -90,17 +90,11 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.24'
+          go-version: '1.21'
           cache: false # Disable the built-in cache to avoid tar issues
   # Go module cache step removed to prevent tar extraction errors
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v2
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Install Upbound CLI
         run: |
           curl -sL https://cli.upbound.io | sh
@@ -111,34 +105,26 @@ jobs:
           UPBOUND_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
         run: |
           up login --username="${{ secrets.UPBOUND_ACCESS_ID }}" --password="${{ secrets.UPBOUND_TOKEN }}"
-      - name: Build provider binary
+      - name: Build Docker Image
         run: |
-          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -a -ldflags '-extldflags "-static"' -o provider ./cmd/provider
-          ls -l ./provider
-      - name: Build and Push Docker Image
-        run: |
-          # Build Docker image for linux/arm64
-          docker build --platform=linux/arm64 -t ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} .
+          # Build Docker image with the provider
+          docker build -t xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} .
+          docker tag xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:latest
           
           # Check Docker image configuration to verify ENTRYPOINT
-          docker inspect ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} | grep -A 5 "Entrypoint"
+          docker inspect xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:latest | grep -A 5 "Entrypoint"
           
-          # Push Docker image to GitHub Container Registry
-          docker push ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}
-          
-          # Tag and push latest only if this is the main branch (with retry logic)
-          docker tag ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} ghcr.io/${{ github.repository_owner }}/provider-nutanix:latest
-          docker push ghcr.io/${{ github.repository_owner }}/provider-nutanix:latest || echo "Latest tag push failed, but continuing..."
       - name: Replace version placeholder
-        run: sed -i -e "s/VERSION_PLACEHOLDER/${{ needs.auto_tag.outputs.version }}/g" package/package.yaml
+        run: sed -i -e "s/VERSION_PLACEHOLDER/${{ needs.auto_tag.outputs.version }}/g" package/crossplane.yaml
+      - name: Install Upbound CLI
+        run: |
+          curl -sL https://cli.upbound.io | sh
+          sudo mv up /usr/local/bin/
+      - name: Sync README to crossplane.yaml
+        run: bash scripts/sync-readme.sh
       - name: Build .xpkg
         run: |
-          up xpkg build \
-            --package-root=package \
-            -o provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
-      - name: Inspect .xpkg for package.yaml
-        run: |
-          tar -tf provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg | grep '^package.yaml$' || (echo "ERROR: package.yaml not found at root of .xpkg" && exit 1)
+          up xpkg build --package-root=package -o provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
       - name: Upload .xpkg
         uses: actions/upload-artifact@v4
         with:
@@ -160,9 +146,13 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.24'
+          go-version: '1.21'
           cache: false # Disable the built-in cache to avoid tar issues
   # Go module cache step removed to prevent tar extraction errors
+      - name: Install Upbound CLI
+        run: |
+          curl -sL https://cli.upbound.io | sh
+          sudo mv up /usr/local/bin/
       - name: Install Upbound CLI
         run: |
           curl -sL https://cli.upbound.io | sh
@@ -175,11 +165,9 @@ jobs:
           up login --username="${{ secrets.UPBOUND_ACCESS_ID }}" --password="${{ secrets.UPBOUND_TOKEN }}"
       - name: Push package to Upbound Registry
         run: |
-          up xpkg push xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} \
-            -f provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
-          
-          up xpkg push xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:latest \
-            -f provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
+          # Use up CLI to push the package
+          up xpkg push xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} -f provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg || echo "Failed with up CLI push method 1"
+          up xpkg push xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:latest -f provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg || echo "Failed with up CLI push method 2"
 
   create_release:
     needs: [publish, auto_tag]

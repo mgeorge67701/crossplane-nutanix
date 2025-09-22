@@ -1,8 +1,6 @@
 # Crossplane Nutanix Provider
 
-<div align="center">
-  <img src="package/icon.svg" alt="Provider Logo" width="100" />
-</div>
+![Provider Logo](package/icon.svg)
 
 A [Crossplane](https://crossplane.io/) provider for managing Nutanix resources. This provider enables you to provision and manage Nutanix virtual machines directly from Kubernetes using Crossplane's declarative approach.
 
