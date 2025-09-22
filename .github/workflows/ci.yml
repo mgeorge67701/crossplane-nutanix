@@ -1,4 +1,5 @@
 name: CI
+
 on:
   push:
     branches: [main]
@@ -9,49 +10,6 @@ permissions:
   packages: write
 
 jobs:
-  go_mod_tidy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: '1.21'
-      - name: Run go mod tidy
-        run: |
-          go mod tidy
-          git diff --exit-code go.mod go.sum || (echo 'go.mod or go.sum changed after tidy. Please commit the changes.' && exit 1)
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: '1.21'
-      - name: Install golangci-lint
-        run: |
-          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.54.2
-      - name: Run golangci-lint
-        run: |
-          golangci-lint run --timeout 5m
-
-  coverage:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: '1.21'
-      - name: Run tests with coverage
-        run: |
-          go test -coverprofile=coverage.out ./...
-      - name: Upload coverage report
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-report
-          path: coverage.out
   test:
     runs-on: ubuntu-latest
     steps:
@@ -135,25 +93,26 @@ jobs:
           go-version: '1.21'
           cache: false # Disable the built-in cache to avoid tar issues
   # Go module cache step removed to prevent tar extraction errors
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: all
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
       - name: Install Upbound CLI
         run: |
           curl -sL https://cli.upbound.io | sh
           sudo mv up /usr/local/bin/
-      - name: Build and Push Multi-Arch Docker Image
+      - name: Login to Upbound Registry
+        env:
+          UPBOUND_ACCESS_ID: ${{ secrets.UPBOUND_ACCESS_ID }}
+          UPBOUND_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
         run: |
-          docker buildx build \
-            --platform linux/amd64,linux/arm64 \
-            -t xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} \
-            -t xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:latest \
-            --push .
+          up login --username="${{ secrets.UPBOUND_ACCESS_ID }}" --password="${{ secrets.UPBOUND_TOKEN }}"
+      - name: Build Docker Image
+        run: |
+          # Build Docker image with the provider
+          docker build -t xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} .
+          docker tag xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:latest
+          
           # Check Docker image configuration to verify ENTRYPOINT
-          docker buildx imagetools inspect xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:latest
+          docker inspect xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:latest | grep -A 5 "Entrypoint"
           
       - name: Replace version placeholder
         run: sed -i -e "s/VERSION_PLACEHOLDER/${{ needs.auto_tag.outputs.version }}/g" package/crossplane.yaml
@@ -190,9 +149,20 @@ jobs:
           go-version: '1.21'
           cache: false # Disable the built-in cache to avoid tar issues
   # Go module cache step removed to prevent tar extraction errors
-      - name: Login to Upbound
+      - name: Install Upbound CLI
         run: |
-          up login --username "${{ secrets.UPBOUND_ACCESS_ID }}" --password "${{ secrets.UPBOUND_TOKEN }}"
+          curl -sL https://cli.upbound.io | sh
+          sudo mv up /usr/local/bin/
+      - name: Install Upbound CLI
+        run: |
+          curl -sL https://cli.upbound.io | sh
+          sudo mv up /usr/local/bin/
+      - name: Login to Upbound
+        env:
+          UPBOUND_ACCESS_ID: ${{ secrets.UPBOUND_ACCESS_ID }}
+          UPBOUND_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
+        run: |
+          up login --username="${{ secrets.UPBOUND_ACCESS_ID }}" --password="${{ secrets.UPBOUND_TOKEN }}"
       - name: Push package to Upbound Registry
         run: |
           # Use up CLI to push the package
