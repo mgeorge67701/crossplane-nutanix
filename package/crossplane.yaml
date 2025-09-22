@@ -8,7 +8,3 @@ metadata:
     meta.crossplane.io/license: Apache-2.0
     meta.crossplane.io/description: |
       A Crossplane provider for Nutanix
-spec:
-  controller:
-    image: ghcr.io/mgeorge67701/provider-nutanix:latest
-    pullPolicy: Always
