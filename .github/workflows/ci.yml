@@ -108,18 +108,13 @@ jobs:
       - name: Login to GitHub Container Registry
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
-      - name: Build Docker Image
-        run: |
-          # Build Docker image for amd64
-          docker build --platform=linux/amd64 -t ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}-amd64 .
-          docker tag ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}-amd64 ghcr.io/${{ github.repository_owner }}/provider-nutanix:latest-amd64
-          docker inspect ghcr.io/${{ github.repository_owner }}/provider-nutanix:latest-amd64 | grep -A 5 "Entrypoint"
-
-          # Build Docker image for arm64
-          docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
-          docker build --platform=linux/arm64 -t ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}-arm64 .
-          docker tag ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}-arm64 ghcr.io/${{ github.repository_owner }}/provider-nutanix:latest-arm64
-          docker inspect ghcr.io/${{ github.repository_owner }}/provider-nutanix:latest-arm64 | grep -A 5 "Entrypoint"
+      - name: Build and push multi-arch image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}
 
       - name: Push Docker Images (amd64 and arm64)
         run: |
