@@ -1,25 +1,25 @@
-# Use Alpine for better Docker compatibility with ENTRYPOINT
-
-# Use build ARG to set architecture
+## Optimized Dockerfile for buildx cache and speed
 ARG TARGETARCH
 FROM golang:1.24-alpine AS builder
 
 WORKDIR /workspace
 
-# Copy go mod files first for better caching
+# Cache go mod and sum for faster builds
 COPY go.mod go.sum ./
 RUN go mod download
 
-# Copy source code
-COPY . .
+# Copy only necessary source files (avoid copying .git, docs, etc.)
+COPY apis/ ./apis/
+COPY cmd/ ./cmd/
+COPY internal/ ./internal/
+COPY package/ ./package/
+COPY scripts/ ./scripts/
+COPY go.mod go.sum ./
 
 # Build the binary for the target architecture
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH:-amd64} go build -ldflags '-extldflags "-static"' -o provider ./cmd/provider
 
-# Use a smaller base image for the final container
-
 FROM alpine:3.19
-
 
 # Copy the binary from the builder stage
 COPY --from=builder /workspace/provider /provider
@@ -27,6 +27,5 @@ COPY --from=builder /workspace/provider /provider
 # Make the binary executable
 RUN chmod +x /provider
 
-# Set very explicit ENTRYPOINT and CMD (fixing "no command specified" error)
 ENTRYPOINT ["/provider"]
 CMD ["--debug"]
