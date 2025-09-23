@@ -14,7 +14,7 @@ RUN go mod download
 COPY . .
 
 # Build the binary for the target architecture
-RUN CGO_ENABLED=0 GOARCH=${TARGETARCH:-amd64} go build -a -ldflags '-extldflags "-static"' -o provider ./cmd/provider
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH:-amd64} go build -ldflags '-extldflags "-static"' -o provider ./cmd/provider
 
 # Use a smaller base image for the final container
 
