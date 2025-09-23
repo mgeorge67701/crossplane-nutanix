@@ -12,8 +12,6 @@ RUN go mod download
 COPY apis/ ./apis/
 COPY cmd/ ./cmd/
 COPY internal/ ./internal/
-COPY package/ ./package/
-COPY scripts/ ./scripts/
 COPY go.mod go.sum ./
 
 # Build the binary for the target architecture
