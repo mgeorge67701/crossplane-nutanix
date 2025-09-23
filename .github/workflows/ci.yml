@@ -137,7 +137,7 @@ jobs:
           curl -sL https://cli.upbound.io | sh
           sudo mv up /usr/local/bin/
       - name: Sync README to crossplane.yaml
-        run: bash scripts/sync-readme.sh
+        run: bash scripts/sync-readme.sh crossplane-package/crossplane.yaml
       - name: Build .xpkg
         run: |
           up xpkg build --package-root=crossplane-package -o provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg

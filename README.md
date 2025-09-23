@@ -19,7 +19,7 @@ A [Crossplane](https://crossplane.io/) provider for managing Nutanix resources. 
 ### 1. Install the Provider
 
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/mgeorge67701/crossplane-nutanix/main/package/crossplane.yaml
+kubectl apply -f https://raw.githubusercontent.com/mgeorge67701/crossplane-nutanix/main/crossplane-package/crossplane.yaml
 ```
 
 ### 2. Create a ProviderConfig
