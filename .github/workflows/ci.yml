@@ -119,14 +119,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Push Docker Images (amd64 and arm64)
-        run: |
-          echo "Pushing amd64 image..."
-          docker push ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}-amd64
-          docker push ghcr.io/${{ github.repository_owner }}/provider-nutanix:latest-amd64
-          echo "Pushing arm64 image..."
-          docker push ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}-arm64
-          docker push ghcr.io/${{ github.repository_owner }}/provider-nutanix:latest-arm64
+      # Manual docker push steps removed; build-push-action handles all tags
 
       - name: Replace version placeholder
         run: sed -i -e "s|VERSION_PLACEHOLDER|${{ needs.auto_tag.outputs.version }}|g" crossplane-package/crossplane.yaml
