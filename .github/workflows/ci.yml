@@ -140,7 +140,7 @@ jobs:
         run: bash scripts/sync-readme.sh
       - name: Build .xpkg
         run: |
-          up xpkg build --package-root=package -o provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
+          up xpkg build --package-root=crossplane-package -o provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
       - name: Upload .xpkg
         uses: actions/upload-artifact@v4
         with:
