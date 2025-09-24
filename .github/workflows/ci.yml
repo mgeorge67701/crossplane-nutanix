@@ -129,7 +129,7 @@ jobs:
       - name: Verify ENTRYPOINT
         run: |
           docker pull ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}
-          docker inspect ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} | grep Entrypoint
+          docker inspect ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} | grep -A 5 Entrypoint
       - name: Replace version placeholder
         run: sed -i -e "s|ghcr.io/${{ github.repository_owner }}/provider-nutanix:.*|ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}|g" crossplane-package/crossplane.yaml
       - name: Install Upbound CLI
