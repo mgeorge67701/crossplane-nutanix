@@ -96,6 +96,9 @@ jobs:
       # Go module cache step removed to prevent tar extraction errors
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
+      - name: Show Dockerfile path
+        run: |
+          echo "Using Dockerfile at $(pwd)/Dockerfile"
       - name: Install Upbound CLI
         run: |
           curl -sL https://cli.upbound.io | sh
