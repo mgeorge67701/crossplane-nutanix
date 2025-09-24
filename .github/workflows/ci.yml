@@ -115,7 +115,9 @@ jobs:
           context: .
           push: true
           platforms: linux/amd64,linux/arm64
-          tags: ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}
+            ghcr.io/${{ github.repository_owner }}/provider-nutanix:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
