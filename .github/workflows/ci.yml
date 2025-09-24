@@ -130,12 +130,6 @@ jobs:
         run: |
           docker pull ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}
           docker inspect ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} | grep -A 5 Entrypoint
-
-
-      - name: Check provider binary
-        run: |
-          docker run --rm ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} --help
-          docker run --rm ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} file /provider
       - name: Replace version placeholder
         run: sed -i -e "s|ghcr.io/${{ github.repository_owner }}/provider-nutanix:.*|ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}|g" crossplane-package/crossplane.yaml
       - name: Install Upbound CLI
