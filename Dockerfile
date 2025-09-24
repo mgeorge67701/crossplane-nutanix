@@ -15,7 +15,7 @@ COPY internal/ ./internal/
 COPY go.mod go.sum ./
 
 # Build the binary for the target architecture
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH:-amd64} go build -ldflags '-extldflags "-static"' -o provider /usr/local/bin/provider
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH:-amd64} go build -ldflags '-extldflags "-static"' -o provider ./cmd/provider
 
 FROM alpine:3.19
 
