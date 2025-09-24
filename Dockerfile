@@ -25,5 +25,5 @@ COPY --from=builder /workspace/provider /provider
 # Make the binary executable
 RUN chmod +x /provider
 
-ENTRYPOINT ["/provider"]
+ENTRYPOINT ["/usr/local/bin/provider"]
 CMD ["--debug"]
