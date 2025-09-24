@@ -1,4 +1,5 @@
 ## Optimized Dockerfile for buildx cache and speed
+ARG TARGETOS
 ARG TARGETARCH
 FROM golang:1.24-alpine AS builder
 
@@ -15,15 +16,14 @@ COPY internal/ ./internal/
 COPY go.mod go.sum ./
 
 # Build the binary for the target architecture
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH:-amd64} go build -ldflags '-extldflags "-static"' -o provider ./cmd/provider
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH:-amd64} go build -ldflags '-extldflags "-static"' -o bin/${TARGETOS}_${TARGETARCH}/crossplane-nutanix-provider ./cmd/provider
 
-FROM alpine:3.19
+FROM gcr.io/distroless/static@sha256:87bce11be0af225e4ca761c40babb06d6d559f5767fbf7dc3c47f0f1a466b92c
 
-# Copy the binary from the builder stage
-COPY --from=builder /workspace/provider /provider
+ARG TARGETOS
+ARG TARGETARCH
 
-# Make the binary executable
-RUN chmod +x /provider
+ADD bin/${TARGETOS}_${TARGETARCH}/crossplane-nutanix-provider /usr/local/bin/crossplane-nutanix-provider
 
-ENTRYPOINT ["/provider"]
-CMD ["--debug"]
+USER 65532
+ENTRYPOINT ["/usr/local/bin/crossplane-nutanix-provider"]
