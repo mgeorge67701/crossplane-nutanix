@@ -43,6 +43,7 @@ Thumbs.db
 bin/
 dist/
 provider-nutanix
+provider
 *.xpkg
 *.tar.gz
 *.zip
