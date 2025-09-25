@@ -533,3 +533,4 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 - **Discussions**: [GitHub Discussions](https://github.com/mgeorge67701/crossplane-nutanix/discussions)
 - **Crossplane Community**: [Crossplane Slack](https://slack.crossplane.io/)
 # Force rebuild with fixed multi-arch images
+# Trigger new build for working configuration
