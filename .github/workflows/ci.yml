@@ -123,7 +123,8 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/provider-nutanix:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          no-cache: true
+          build-args: |
+            TARGETOS=linux
 
       # Manual docker push steps removed; build-push-action handles all tags
       - name: Verify ENTRYPOINT
