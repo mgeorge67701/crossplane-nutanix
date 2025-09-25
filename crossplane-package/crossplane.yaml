@@ -14,7 +14,7 @@ metadata:
       of Nutanix resources on clusters provisioned by Crossplane.
 spec:
   controller:
-    image: ghcr.io/mgeorge67701/provider-nutanix:VERSION_PLACEHOLDER
+    image: ghcr.io/mgeorge67701/provider-nutanix:latest
   crds:
     - file: nutanix.crossplane.io_providerconfigs.yaml
     - file: nutanix.crossplane.io_virtualmachines.yaml
