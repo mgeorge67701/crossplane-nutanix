@@ -109,11 +109,6 @@ spec:
                   additionalProperties:
                     type: string
                   type: object
-                datacenterCredentials:
-                  description: Maps datacenter names to their specific credentials.
-                  additionalProperties:
-                    type: object
-                  type: object
                 enableAvailabilityZoneMapping:
                   description: Controls whether the provider should use the availability zone mapping feature.
                   type: boolean
