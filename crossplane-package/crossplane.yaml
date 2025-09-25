@@ -36,3 +36,4 @@ spec:
   crds:
     - file: nutanix.crossplane.io_providerconfigs.yaml
     - file: nutanix.crossplane.io_virtualmachines.yaml
+    
