@@ -32,10 +32,16 @@ spec:
 EOF
 ```
 
-**Option 2: Using Crossplane CLI**
+**Option 2: Using Crossplane CLI (GitHub Container Registry)**
 
 ```bash
 kubectl crossplane install provider ghcr.io/mgeorge67701/provider-nutanix:latest
+```
+
+**Option 3: Using Upbound Marketplace**
+
+```bash
+kubectl crossplane install provider xpkg.upbound.io/mgeorge67701/provider-nutanix:latest
 ```
 
 **Verify Installation**
@@ -446,6 +452,31 @@ This project uses automated versioning and releases via GitHub Actions:
    ```
 
 3. **Available Versions**: Check [GitHub Releases](https://github.com/mgeorge67701/crossplane-nutanix/releases) for all available versions
+
+### Publishing to Upbound Marketplace
+
+To publish your provider to the Upbound Marketplace (like provider-kubernetes):
+
+1. **Set up Upbound credentials** in GitHub Secrets:
+   - `UPBOUND_ACCESS_ID`: Your Upbound access ID
+   - `UPBOUND_TOKEN`: Your Upbound token
+
+2. **Create a release** - the CI/CD will automatically publish to both:
+   - GitHub Container Registry: `ghcr.io/mgeorge67701/provider-nutanix:VERSION`
+   - Upbound Registry: `xpkg.upbound.io/mgeorge67701/provider-nutanix:VERSION`
+
+3. **Your provider will appear** in the Upbound Marketplace at:
+   `https://marketplace.upbound.io/providers/mgeorge67701/provider-nutanix`
+
+**Manual publish to Upbound**:
+```bash
+# Login to Upbound
+up login
+
+# Build and push package
+up xpkg build --package-root=crossplane-package --controller=ghcr.io/mgeorge67701/provider-nutanix:v1.0.0 -o provider.xpkg
+up xpkg push xpkg.upbound.io/mgeorge67701/provider-nutanix:v1.0.0 -f provider.xpkg
+```
 
 ## Troubleshooting
 

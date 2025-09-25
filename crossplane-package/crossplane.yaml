@@ -3,15 +3,35 @@ kind: Provider
 metadata:
   name: provider-nutanix
   annotations:
-    meta.crossplane.io/maintainer: Mohan George <your@email.com>
+    meta.crossplane.io/maintainer: Mohan George <mohan@example.com>
     meta.crossplane.io/source: github.com/mgeorge67701/crossplane-nutanix
     meta.crossplane.io/license: Apache-2.0
     friendly-name.meta.crossplane.io: Provider Nutanix
     meta.crossplane.io/description: |
-      The Crossplane Nutanix provider enables management of Nutanix resources.
+      The Crossplane Nutanix provider enables management of Nutanix virtual machines and infrastructure.
     meta.crossplane.io/readme: |
       `provider-nutanix` is a Crossplane Provider that enables deployment and management
-      of Nutanix resources on clusters provisioned by Crossplane.
+      of Nutanix virtual machines and infrastructure on clusters provisioned by Crossplane.
+
+      ## Features
+
+      - Virtual Machine lifecycle management
+      - Multi-datacenter Prism Central support  
+      - Dynamic resource resolution (names to UUIDs)
+      - Flexible authentication with datacenter-specific credentials
+      - Line of Business validation
+      - Additional disk attachment
+      - Custom metadata support
+
+      ## Quick Start
+
+      Install the provider:
+      ```bash
+      kubectl crossplane install provider xpkg.upbound.io/mgeorge67701/provider-nutanix:latest
+      ```
+
+      For detailed documentation and examples, visit:
+      [GitHub Repository](https://github.com/mgeorge67701/crossplane-nutanix)
 spec:
   crds:
     - file: nutanix.crossplane.io_providerconfigs.yaml
