@@ -1,0 +1,42 @@
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  annotations:
+    argocd.argoproj.io/tracking-id: crossplane-provider-configs:pkg.crossplane.io/Provider:crossplane-system/mgeorge67701-provider-nutanix
+  creationTimestamp: "2025-09-25T19:55:47Z"
+  generation: 3
+  labels:
+    app.kubernetes.io/part-of: crossplane
+    provider: nutanix
+  name: mgeorge67701-provider-nutanix
+  resourceVersion: "6415848"
+  uid: d408166f-c59b-4d1b-a837-c898f6750243
+spec:
+  ignoreCrossplaneConstraints: false
+  package: ghcr.io/mgeorge67701/provider-nutanix:v0.0.17
+  packagePullPolicy: Always
+  revisionActivationPolicy: Automatic
+  revisionHistoryLimit: 1
+  runtimeConfigRef:
+    apiVersion: pkg.crossplane.io/v1beta1
+    kind: DeploymentRuntimeConfig
+    name: default
+  skipDependencyResolution: false
+status:
+  conditions:
+  - lastTransitionTime: "2025-09-25T20:41:40Z"
+    message: 'Package runtime health is "False" with message: post establish runtime
+      hook failed for package: provider package deployment is unavailable with message:
+      Deployment does not have minimum availability.'
+    observedGeneration: 3
+    reason: UnhealthyPackageRevision
+    status: "False"
+    type: Healthy
+  - lastTransitionTime: "2025-09-25T20:41:40Z"
+    observedGeneration: 3
+    reason: ActivePackageRevision
+    status: "True"
+    type: Installed
+  currentIdentifier: ghcr.io/mgeorge67701/provider-nutanix:v0.0.17
+  currentRevision: mgeorge67701-provider-nutanix-1cffb5fc9218
+  resolvedPackage: ghcr.io/mgeorge67701/provider-nutanix:v0.0.17

@@ -18,8 +18,46 @@ A [Crossplane](https://crossplane.io/) provider for managing Nutanix resources. 
 
 ### 1. Install the Provider
 
+**Option 1: Using kubectl (Crossplane package)**
+
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/mgeorge67701/crossplane-nutanix/main/crossplane-package/crossplane.yaml
+kubectl apply -f - <<EOF
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: mgeorge67701-provider-nutanix
+spec:
+  package: ghcr.io/mgeorge67701/provider-nutanix:latest
+  packagePullPolicy: Always
+EOF
+```
+
+**Option 2: Using Crossplane CLI**
+
+```bash
+kubectl crossplane install provider ghcr.io/mgeorge67701/provider-nutanix:latest
+```
+
+**Verify Installation**
+
+```bash
+# Check provider status
+kubectl get providers.pkg.crossplane.io -n crossplane-system
+
+# Check provider pod is running
+kubectl get pods -n crossplane-system | grep nutanix
+
+# Check CRDs are installed
+kubectl get crd | grep nutanix
+```
+
+Expected output:
+```
+NAME                            INSTALLED   HEALTHY   PACKAGE
+mgeorge67701-provider-nutanix   True        True      ghcr.io/mgeorge67701/provider-nutanix:latest
+
+providerconfigs.nutanix.crossplane.io
+virtualmachines.nutanix.crossplane.io
 ```
 
 ### 2. Create a ProviderConfig
@@ -343,25 +381,84 @@ This diagram shows how Crossplane, your custom Nutanix provider controller, and 
 ### Building
 
 ```bash
-# Generate CRDs
-make generate-crds
+# Build the Docker image
+docker build -t ghcr.io/mgeorge67701/provider-nutanix:latest .
 
-# Build provider binary
-make build
+# Build the Crossplane package (xpkg)
+up xpkg build --package-root=crossplane-package --controller=ghcr.io/mgeorge67701/provider-nutanix:latest -o provider-nutanix-latest.xpkg
 
-# Build and push container
-make docker-build docker-push IMG=your-registry/provider-nutanix:latest
+# Push both the container image and package
+docker push ghcr.io/mgeorge67701/provider-nutanix:latest
+up xpkg push ghcr.io/mgeorge67701/provider-nutanix:latest -f provider-nutanix-latest.xpkg
 ```
 
 ### Testing
 
 ```bash
 # Run unit tests
-make test
+go test ./...
 
-# Run controller locally
-make run
+# Run controller locally (requires Kubernetes cluster and KUBECONFIG)
+go run cmd/provider/main.go --debug
 ```
+
+### Releasing
+
+This project uses automated versioning and releases via GitHub Actions:
+
+1. **Create a git tag**: The CI pipeline will detect the tag and build/publish automatically
+   ```bash
+   git tag v1.0.0
+   git push origin v1.0.0
+   ```
+
+2. **Manual Release**: For manual releases, follow these steps:
+   ```bash
+   # Build and push Docker image
+   docker buildx build --platform linux/amd64,linux/arm64 -t ghcr.io/mgeorge67701/provider-nutanix:v1.0.0 --push .
+   
+   # Build and push Crossplane package
+   up xpkg build --package-root=crossplane-package --controller=ghcr.io/mgeorge67701/provider-nutanix:v1.0.0 -o provider-nutanix-v1.0.0.xpkg
+   up xpkg push ghcr.io/mgeorge67701/provider-nutanix:v1.0.0 -f provider-nutanix-v1.0.0.xpkg
+   ```
+
+3. **Available Versions**: Check [GitHub Releases](https://github.com/mgeorge67701/crossplane-nutanix/releases) for all available versions
+
+## Troubleshooting
+
+### Provider Pod Shows "CreateContainerError: no command specified"
+
+This error occurs when the Crossplane package (xpkg) is built incorrectly. The issue is usually:
+
+1. **Hardcoded controller image in crossplane.yaml**: The `spec.controller.image` field should NOT be present in `crossplane-package/crossplane.yaml`
+2. **Incorrect xpkg build**: Use `up xpkg build --controller=<image>` to properly reference the controller image
+3. **Broken Docker image**: Ensure your Dockerfile has proper `ENTRYPOINT` and `CMD` instructions
+
+**Solution**:
+```bash
+# 1. Remove spec.controller.image from crossplane-package/crossplane.yaml
+# 2. Build Docker image first
+docker build -t ghcr.io/mgeorge67701/provider-nutanix:v1.0.0 .
+
+# 3. Build xpkg with --controller flag
+up xpkg build --package-root=crossplane-package --controller=ghcr.io/mgeorge67701/provider-nutanix:v1.0.0 -o provider.xpkg
+
+# 4. Push both
+docker push ghcr.io/mgeorge67701/provider-nutanix:v1.0.0
+up xpkg push ghcr.io/mgeorge67701/provider-nutanix:v1.0.0 -f provider.xpkg
+```
+
+### Provider Shows as Unhealthy
+
+Check the provider revision status:
+```bash
+kubectl get providerrevisions.pkg.crossplane.io -o wide
+kubectl describe providerrevision <revision-name>
+```
+
+### CRDs Not Installing
+
+Ensure your CRD files are in the correct location and referenced properly in `crossplane-package/crossplane.yaml`.
 
 ## Contributing
 
