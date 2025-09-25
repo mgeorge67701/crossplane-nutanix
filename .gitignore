@@ -8,21 +8,45 @@
 # Test binary, built with `go test -c`
 *.test
 
-# Output of the go coverage tool
+# Output of the go coverage tool, specifically when used with LiteIDE
 *.out
+
+# Dependency directories (remove the comment below to include it)
+# vendor/
 
 # Go workspace file
 go.work
-go.work.sum
-
-# Dependency directories
-vendor/
 
 # IDE files
 .vscode/
 .idea/
-*.swp
-*.swo
+
+# Provider binary
+provider
+
+# Crossplane packages
+*.xpkg
+
+# System files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+*~
+*backup*
+
+# Build artifacts
+dist/
+build/
+bin/
 *~
 
 # OS generated files

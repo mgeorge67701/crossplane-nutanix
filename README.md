@@ -380,6 +380,29 @@ This diagram shows how Crossplane, your custom Nutanix provider controller, and 
 
 ### Building
 
+**Using Make (Recommended)**
+
+```bash
+# Show all available commands
+make help
+
+# Build and test
+make test
+make docker-build
+make xpkg-build
+
+# Complete release (build multi-platform image and package)
+make release VERSION=v1.0.0
+
+# Install provider in current cluster
+make install VERSION=v1.0.0
+
+# Check provider status
+make status
+```
+
+**Manual Building**
+
 ```bash
 # Build the Docker image
 docker build -t ghcr.io/mgeorge67701/provider-nutanix:latest .
