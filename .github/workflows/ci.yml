@@ -185,8 +185,8 @@ jobs:
 
       - name: Push .xpkg to GHCR
         run: |
-          up xpkg push ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} -f provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
-          up xpkg push ghcr.io/${{ github.repository_owner }}/provider-nutanix:latest -f provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
+          up xpkg push ghcr.io/${{ github.repository_owner }}/provider-nutanix-xpkg:${{ needs.auto_tag.outputs.version }} -f provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
+          up xpkg push ghcr.io/${{ github.repository_owner }}/provider-nutanix-xpkg:latest -f provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
 
   create_release:
     needs: [publish, auto_tag]
