@@ -53,9 +53,9 @@ kind: Secret
 metadata:
   name: nutanix-creds-beta
   namespace: crossplane-system
-type: Opaque
-stringData:
-  credentials: '{"username":"admin-beta","password":"beta-password"}'
+ type: Opaque
+ stringData:
+   credentials: '{"username":"admin-beta","password":"beta-password"}'
 ```
 
 Apply the ProviderConfig:
