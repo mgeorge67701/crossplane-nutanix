@@ -18,7 +18,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
       - name: Login to GitHub Container Registry
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-      - name: Build and push Docker image
+      - name: Build and push multi-arch Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -26,3 +26,18 @@ jobs:
           platforms: linux/amd64,linux/arm64
           tags: |
             ghcr.io/${{ github.repository_owner }}/provider-nutanix:latest
+      - name: Install Upbound CLI
+        run: |
+          curl -sL https://cli.upbound.io | sh
+          sudo mv up /usr/local/bin/
+      - name: Build xpkg with multi-arch Docker image reference
+        run: |
+          up xpkg build --package-root=crossplane-package --controller=ghcr.io/${{ github.repository_owner }}/provider-nutanix:latest -o provider-nutanix-latest.xpkg
+      - name: Login to Upbound Registry
+        env:
+          UPBOUND_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
+        run: |
+          up login --token="${{ secrets.UPBOUND_TOKEN }}"
+      - name: Push xpkg to Upbound (no Docker image overwriting)
+        run: |
+          up xpkg push xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:latest -f provider-nutanix-latest.xpkg
