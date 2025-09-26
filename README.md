@@ -409,6 +409,8 @@ make status
 
 **Manual Building**
 
+**Single Architecture (local development):**
+
 ```bash
 # Build the Docker image
 docker build -t ghcr.io/mgeorge67701/provider-nutanix:latest .
@@ -420,6 +422,77 @@ up xpkg build --package-root=crossplane-package --controller=ghcr.io/mgeorge6770
 docker push ghcr.io/mgeorge67701/provider-nutanix:latest
 up xpkg push ghcr.io/mgeorge67701/provider-nutanix:latest -f provider-nutanix-latest.xpkg
 ```
+
+**Multi-Architecture Build (Production - Tested: v0.2.13)**
+
+> **✅ CONFIRMED WORKING**: Both GHCR and Upbound registries work with this approach
+
+```bash
+# Set your version
+export VERSION=v0.2.13
+
+# Step 1: Build and push multi-architecture controller image (with -controller suffix)
+make docker-buildx VERSION=${VERSION}
+# This runs: docker buildx build --platform linux/amd64,linux/arm64 -t ghcr.io/mgeorge67701/provider-nutanix:v0.2.13-controller --push .
+
+# Step 2: Build Crossplane package using the controller image
+make xpkg-build VERSION=${VERSION}
+# This runs: up xpkg build --package-root=crossplane-package --controller=ghcr.io/mgeorge67701/provider-nutanix:v0.2.13-controller -o provider-nutanix-v0.2.13.xpkg
+
+# Step 3: Push to GHCR (GitHub Container Registry)
+make xpkg-push VERSION=${VERSION}
+# This runs: up xpkg push ghcr.io/mgeorge67701/provider-nutanix:v0.2.13 -f provider-nutanix-v0.2.13.xpkg
+
+# OR Step 3: Push to Upbound Registry (alternative)
+up xpkg push xpkg.upbound.io/mgeorge67701/provider-nutanix:${VERSION} -f provider-nutanix-${VERSION}.xpkg
+```
+
+**Manual Multi-Architecture Commands (without Make):**
+
+```bash
+# Set version
+export VERSION=v0.2.9-fixed
+
+# Step 1: Setup Docker Buildx (one-time setup)
+docker buildx create --name multiarch --driver docker-container --bootstrap --use
+
+# Step 2: Build and push multi-architecture image
+docker buildx build \
+  --platform linux/amd64,linux/arm64 \
+  --tag ghcr.io/mgeorge67701/provider-nutanix:${VERSION} \
+  --push \
+  .
+
+# Step 3: Build Crossplane package
+up xpkg build \
+  --package-root=crossplane-package \
+  --controller=ghcr.io/mgeorge67701/provider-nutanix:${VERSION} \
+  -o provider-nutanix-${VERSION}.xpkg
+
+# Step 4: Push Crossplane package
+up xpkg push ghcr.io/mgeorge67701/provider-nutanix:${VERSION} -f provider-nutanix-${VERSION}.xpkg
+```
+
+**Verify Multi-Architecture Build:**
+
+```bash
+# Check controller image has both architectures
+docker buildx imagetools inspect ghcr.io/mgeorge67701/provider-nutanix:v0.2.13-controller
+
+# Test deployment from GHCR
+kubectl patch provider.pkg.crossplane.io mgeorge67701-provider-nutanix --type='merge' -p='{"spec":{"package":"ghcr.io/mgeorge67701/provider-nutanix:v0.2.13"}}'
+kubectl get provider.pkg.crossplane.io mgeorge67701-provider-nutanix
+
+# Test deployment from Upbound Registry
+kubectl patch provider.pkg.crossplane.io mgeorge67701-provider-nutanix --type='merge' -p='{"spec":{"package":"xpkg.upbound.io/mgeorge67701/provider-nutanix:v0.2.13-xpkg"}}'
+kubectl get provider.pkg.crossplane.io mgeorge67701-provider-nutanix
+```
+
+**Test Results (Confirmed Working):**
+- ✅ **GHCR**: `ghcr.io/mgeorge67701/provider-nutanix:v0.2.13` → INSTALLED: True, HEALTHY: True
+- ✅ **Upbound**: `xpkg.upbound.io/mgeorge67701/provider-nutanix:v0.2.13-xpkg` → INSTALLED: True, HEALTHY: True
+- ✅ **Multi-arch**: Both linux/amd64 and linux/arm64 platforms supported
+- ✅ **Pod Status**: Running successfully with proper entrypoint
 
 ### Testing
 
@@ -487,8 +560,18 @@ This error occurs when the Crossplane package (xpkg) is built incorrectly. The i
 1. **Hardcoded controller image in crossplane.yaml**: The `spec.controller.image` field should NOT be present in `crossplane-package/crossplane.yaml`
 2. **Incorrect xpkg build**: Use `up xpkg build --controller=<image>` to properly reference the controller image
 3. **Broken Docker image**: Ensure your Dockerfile has proper `ENTRYPOINT` and `CMD` instructions
+4. **Pipeline overwrites controller image**: In CI/CD, the xpkg build can overwrite the controller image if not done properly
 
-**Solution**:
+**Solution (Multi-Architecture - Recommended)**:
+```bash
+# Use the multi-architecture build process (see Manual Building section above)
+export VERSION=v0.2.9-fixed
+make docker-buildx VERSION=${VERSION}  # Multi-arch controller image
+make xpkg-build VERSION=${VERSION}     # Package with proper controller reference
+make xpkg-push VERSION=${VERSION}      # Push package
+```
+
+**Solution (Single Architecture)**:
 ```bash
 # 1. Remove spec.controller.image from crossplane-package/crossplane.yaml
 # 2. Build Docker image first
@@ -532,5 +615,3 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 - **Issues**: [GitHub Issues](https://github.com/mgeorge67701/crossplane-nutanix/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/mgeorge67701/crossplane-nutanix/discussions)
 - **Crossplane Community**: [Crossplane Slack](https://slack.crossplane.io/)
-# Force rebuild with fixed multi-arch images
-# Trigger new build for working configuration

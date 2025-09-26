@@ -6,8 +6,9 @@ PROJECT_NAME ?= provider-nutanix
 VERSION ?= latest
 PLATFORMS ?= linux/amd64,linux/arm64
 
-# Docker image
+# Docker images
 IMG ?= $(REGISTRY)/$(PROJECT_NAME):$(VERSION)
+CONTROLLER_IMG ?= $(REGISTRY)/$(PROJECT_NAME):$(VERSION)-controller
 
 # Crossplane package
 XPKG_FILE ?= $(PROJECT_NAME)-$(VERSION).xpkg
@@ -56,14 +57,14 @@ docker-push: ## Push the Docker image
 	docker push $(IMG)
 
 .PHONY: docker-buildx
-docker-buildx: ## Build and push multi-platform Docker image
-	docker buildx build --platform $(PLATFORMS) -t $(IMG) --push .
+docker-buildx: ## Build and push multi-platform controller image
+	docker buildx build --platform $(PLATFORMS) -t $(CONTROLLER_IMG) --push .
 
 ##@ Crossplane Package
 
 .PHONY: xpkg-build
 xpkg-build: ## Build the Crossplane package
-	up xpkg build --package-root=crossplane-package --controller=$(IMG) -o $(XPKG_FILE)
+	up xpkg build --package-root=crossplane-package --controller=$(CONTROLLER_IMG) -o $(XPKG_FILE)
 
 .PHONY: xpkg-push
 xpkg-push: ## Push the Crossplane package
@@ -73,7 +74,8 @@ xpkg-push: ## Push the Crossplane package
 
 .PHONY: release
 release: docker-buildx xpkg-build xpkg-push ## Build and push everything for a release
-	@echo "Released $(IMG)"
+	@echo "Released controller: $(CONTROLLER_IMG)"
+	@echo "Released package: $(IMG)"
 
 ##@ Installation
 
