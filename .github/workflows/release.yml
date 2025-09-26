@@ -21,13 +21,13 @@ jobs:
       - name: Log in to GitHub Container Registry
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
-      - name: Build and push multi-arch image
+      - name: Build and push multi-arch controller image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
           platforms: linux/amd64,linux/arm64
-          tags: ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ github.ref_name }}
+          tags: ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ github.ref_name }}-controller
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -38,10 +38,17 @@ jobs:
         run: |
           curl -sL https://cli.upbound.io | sh
           echo "$HOME/.up/bin" >> $GITHUB_PATH
+          
+      - name: Login to GitHub Container Registry for Upbound
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | up registry login ghcr.io -u ${{ github.actor }} --password-stdin
 
       - name: Build Crossplane package
         run: |
-          up xpkg build crossplane-package
+          up xpkg build --package-root=crossplane-package --controller=ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ github.ref_name }}-controller
+          
+      - name: Push Crossplane package
+        run: |
+          up xpkg push ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ github.ref_name }} -f crossplane-package/*.xpkg
 
       - name: Upload release assets
         uses: softprops/action-gh-release@v2
