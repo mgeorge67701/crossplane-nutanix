@@ -428,6 +428,8 @@ up xpkg push ghcr.io/mgeorge67701/provider-nutanix:latest -f provider-nutanix-la
 > **✅ CONFIRMED WORKING**: Both GHCR and Upbound registries work with this approach
 
 ```bash
+echo $GITHUB_TOKEN | docker login ghcr.io -u mgeorge67701 --password-stdin
+up login
 # Set your version
 export VERSION=v0.3.0
 
