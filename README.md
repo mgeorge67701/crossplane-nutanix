@@ -447,6 +447,29 @@ make xpkg-push VERSION=${VERSION}
 
 # OR Step 3: Push to Upbound Registry (alternative)
 up xpkg push xpkg.upbound.io/mgeorge67701/provider-nutanix:${VERSION} -f provider-nutanix-${VERSION}.xpkg
+
+# Step 4: Create a GitHub release
+# First, create and push a git tag
+git tag ${VERSION}
+git push origin ${VERSION}
+
+# Set your GitHub token (create one at https://github.com/settings/tokens)
+# with 'repo' scope for private repos or 'public_repo' for public repos
+export GITHUB_TOKEN=your_token_here
+
+# Create the release using GitHub API
+curl -X POST -H "Authorization: Bearer $GITHUB_TOKEN" \
+  -H "Accept: application/vnd.github.v3+json" \
+  -H "Content-Type: application/json" \
+  "https://api.github.com/repos/mgeorge67701/crossplane-nutanix/releases" \
+  -d "{
+    \"tag_name\": \"${VERSION}\",
+    \"name\": \"${VERSION}\",
+    \"body\": \"Release ${VERSION} of provider-nutanix\\n\\n## What's Changed\\n- Provider package built and published to ghcr.io/mgeorge67701/provider-nutanix:${VERSION}-controller\\n- Package also available on Upbound registry: xpkg.upbound.io/mgeorge67701/provider-nutanix:${VERSION}\",
+    \"draft\": false,
+    \"prerelease\": false,
+    \"generate_release_notes\": true
+  }"
 ```
 
 **Manual Multi-Architecture Commands (without Make):**
@@ -476,6 +499,27 @@ up xpkg push ghcr.io/mgeorge67701/provider-nutanix:${VERSION} -f provider-nutani
 
 # Optional: Push to Upbound Registry
 up xpkg push xpkg.upbound.io/mgeorge67701/provider-nutanix:${VERSION} -f provider-nutanix-${VERSION}.xpkg
+
+# Step 5: Create GitHub Release
+git tag ${VERSION}
+git push origin ${VERSION}
+
+# Set your GitHub token (if not already set)
+export GITHUB_TOKEN=your_token_here
+
+# Create the release with release notes
+curl -X POST -H "Authorization: Bearer $GITHUB_TOKEN" \
+  -H "Accept: application/vnd.github.v3+json" \
+  -H "Content-Type: application/json" \
+  "https://api.github.com/repos/mgeorge67701/crossplane-nutanix/releases" \
+  -d "{
+    \"tag_name\": \"${VERSION}\",
+    \"name\": \"${VERSION}\",
+    \"body\": \"Release ${VERSION} of provider-nutanix\\n\\n## What's Changed\\n- Provider package built and published to ghcr.io/mgeorge67701/provider-nutanix:${VERSION}-controller\\n- Package also available on Upbound registry: xpkg.upbound.io/mgeorge67701/provider-nutanix:${VERSION}\",
+    \"draft\": false,
+    \"prerelease\": false,
+    \"generate_release_notes\": true
+  }"
 ```
 
 **Verify Multi-Architecture Build:**
@@ -523,11 +567,25 @@ This project uses automated versioning and releases via GitHub Actions:
 2. **Manual Release**: For manual releases, follow these steps:
    ```bash
    # Build and push Docker image
-   docker buildx build --platform linux/amd64,linux/arm64 -t ghcr.io/mgeorge67701/provider-nutanix:v1.0.0 --push .
+   docker buildx build --platform linux/amd64,linux/arm64 -t ghcr.io/mgeorge67701/provider-nutanix:v1.0.0-controller --push .
    
    # Build and push Crossplane package
-   up xpkg build --package-root=crossplane-package --controller=ghcr.io/mgeorge67701/provider-nutanix:v1.0.0 -o provider-nutanix-v1.0.0.xpkg
+   up xpkg build --package-root=crossplane-package --controller=ghcr.io/mgeorge67701/provider-nutanix:v1.0.0-controller -o provider-nutanix-v1.0.0.xpkg
    up xpkg push ghcr.io/mgeorge67701/provider-nutanix:v1.0.0 -f provider-nutanix-v1.0.0.xpkg
+   
+   # Create GitHub Release (set GITHUB_TOKEN environment variable first)
+   curl -X POST -H "Authorization: Bearer $GITHUB_TOKEN" \
+     -H "Accept: application/vnd.github.v3+json" \
+     -H "Content-Type: application/json" \
+     "https://api.github.com/repos/mgeorge67701/crossplane-nutanix/releases" \
+     -d "{
+       \"tag_name\": \"v1.0.0\",
+       \"name\": \"v1.0.0\",
+       \"body\": \"Release v1.0.0 of provider-nutanix\\n\\n## What's Changed\\n- Provider package built and published to ghcr.io/mgeorge67701/provider-nutanix:v1.0.0-controller\\n- Package also available on Upbound registry: xpkg.upbound.io/mgeorge67701/provider-nutanix:v1.0.0\",
+       \"draft\": false,
+       \"prerelease\": false,
+       \"generate_release_notes\": true
+     }"
    ```
 
 3. **Available Versions**: Check [GitHub Releases](https://github.com/mgeorge67701/crossplane-nutanix/releases) for all available versions
