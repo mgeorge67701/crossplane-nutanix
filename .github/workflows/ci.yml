@@ -207,7 +207,7 @@ jobs:
         run: |
           if [ -n "${{ secrets.UPBOUND_ACCESS_ID }}" ] && [ -n "${{ secrets.UPBOUND_TOKEN }}" ]; then
             echo "credentials_available=true" >> $GITHUB_OUTPUT
-            echo "✅ Upbound credentials are available"
+            echo "✅ Upbound credentials are available (Access ID: ${{ secrets.UPBOUND_ACCESS_ID }})"
           else
             echo "credentials_available=false" >> $GITHUB_OUTPUT
             echo "⚠️ Upbound credentials not found - skipping mirror step"
@@ -219,6 +219,8 @@ jobs:
 
       - name: Login to Upbound Registry
         if: steps.check_credentials.outputs.credentials_available == 'true'
+        continue-on-error: true
+        id: upbound_login
         uses: docker/login-action@v3
         with:
           registry: "xpkg.upbound.io"
@@ -226,12 +228,25 @@ jobs:
           password: ${{ secrets.UPBOUND_TOKEN }}
 
       - name: Mirror to Upbound Registry
-        if: steps.check_credentials.outputs.credentials_available == 'true'
+        if: steps.check_credentials.outputs.credentials_available == 'true' && steps.upbound_login.outcome == 'success'
+        continue-on-error: true
         run: |
           echo "Mirroring images to Upbound Registry..."
           crane copy ${{ env.CROSSPLANE_REGORG }}/${{ env.PROVIDER_REPO }}:${{ needs.auto_tag.outputs.version }} ${{ env.UPBOUND_REGORG }}/${{ env.PROVIDER_REPO }}:${{ needs.auto_tag.outputs.version }} --allow-nondistributable-artifacts
           crane copy ${{ env.CROSSPLANE_REGORG }}/${{ env.PROVIDER_REPO }}:${{ needs.auto_tag.outputs.version }} ${{ env.UPBOUND_REGORG }}/${{ env.PROVIDER_REPO }}:latest --allow-nondistributable-artifacts
           echo "✅ Successfully mirrored to Upbound Registry"
+
+      - name: Handle Upbound Issues
+        if: steps.check_credentials.outputs.credentials_available == 'true' && (steps.upbound_login.outcome != 'success' || steps.upbound_login.outcome == 'failure')
+        run: |
+          echo "⚠️ Upbound Registry access failed - this is non-critical"
+          echo "Possible causes:"
+          echo "  - Credentials may need to be refreshed"
+          echo "  - Upbound registry may be temporarily unavailable"
+          echo "  - Access ID format may have changed"
+          echo ""
+          echo "✅ GitHub Container Registry publishing completed successfully"
+          echo "Your multi-arch images are available at: ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}"
 
       - name: Skip Upbound Mirror
         if: steps.check_credentials.outputs.credentials_available == 'false'
