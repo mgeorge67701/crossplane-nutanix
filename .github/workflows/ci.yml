@@ -283,13 +283,15 @@ jobs:
             echo "credential_type=UPBOUND" >> $GITHUB_OUTPUT
             echo "✅ Upbound credentials are available (UPBOUND_ACCESS_ID found)"
             echo "🔍 Access ID format: ${{ secrets.UPBOUND_ACCESS_ID }}"
-            echo "🔍 Token length: ${#${{ secrets.UPBOUND_TOKEN }}} characters"
+            TOKEN_LENGTH=$(echo "${{ secrets.UPBOUND_TOKEN }}" | wc -c)
+            echo "🔍 Token length: ${TOKEN_LENGTH} characters"
           elif [ -n "${{ secrets.XPKG_ACCESS_ID }}" ] && [ -n "${{ secrets.XPKG_TOKEN }}" ]; then
             echo "credentials_available=true" >> $GITHUB_OUTPUT
             echo "credential_type=XPKG" >> $GITHUB_OUTPUT
             echo "✅ Upbound credentials are available (XPKG_ACCESS_ID found)"
             echo "🔍 Access ID format: ${{ secrets.XPKG_ACCESS_ID }}"
-            echo "🔍 Token length: ${#${{ secrets.XPKG_TOKEN }}} characters"
+            TOKEN_LENGTH=$(echo "${{ secrets.XPKG_TOKEN }}" | wc -c)
+            echo "🔍 Token length: ${TOKEN_LENGTH} characters"
           else
             echo "credentials_available=false" >> $GITHUB_OUTPUT
             echo "⚠️ Upbound credentials not found - skipping mirror step"
