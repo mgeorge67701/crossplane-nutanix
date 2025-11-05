@@ -120,6 +120,23 @@ jobs:
             --tag ghcr.io/${{ github.repository_owner }}/provider-nutanix:latest \
             .
 
+      - name: Verify image availability
+        run: |
+          echo "Verifying multi-arch image build..."
+          sleep 15
+          
+          # Retry mechanism for image inspection
+          for i in {1..5}; do
+            echo "Attempt $i: Checking image availability..."
+            if docker buildx imagetools inspect ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}; then
+              echo "✅ Image is available!"
+              break
+            else
+              echo "⏳ Image not ready yet, waiting 10 seconds..."
+              sleep 10
+            fi
+          done
+
       - name: Install Upbound CLI
         run: |
           curl -sL https://cli.upbound.io | sh
