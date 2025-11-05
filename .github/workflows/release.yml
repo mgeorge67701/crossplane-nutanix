@@ -40,15 +40,20 @@ jobs:
           sudo mv $HOME/.up/bin/up /usr/local/bin/
           up --help | head -5
           
-      - name: Login to GitHub Container Registry for Upbound
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | up registry login ghcr.io -u ${{ github.actor }} --password-stdin
+      - name: Login to GitHub Container Registry
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
       - name: Login to Upbound Registry
         env:
           UPBOUND_ACCESS_ID: ${{ secrets.UPBOUND_ACCESS_ID }}
           UPBOUND_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
         run: |
-          up login --username="${UPBOUND_ACCESS_ID}" --password="${UPBOUND_TOKEN}"
+          if [ -n "$UPBOUND_ACCESS_ID" ] && [ -n "$UPBOUND_TOKEN" ]; then
+            up login --username="${UPBOUND_ACCESS_ID}" --password="${UPBOUND_TOKEN}"
+            echo "Successfully logged in to Upbound"
+          else
+            echo "Upbound credentials not found, will skip Upbound registry push"
+          fi
 
       - name: Build Crossplane package
         run: |
