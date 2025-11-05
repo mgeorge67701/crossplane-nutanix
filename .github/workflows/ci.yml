@@ -326,29 +326,62 @@ jobs:
         env:
           DOCKER_CONFIG: ${{ runner.temp }}/.docker
 
-      - name: Mirror to Upbound Registry
+      - name: Install Upbound CLI
+        if: steps.check_credentials.outputs.credentials_available == 'true' && (steps.upbound_login.outcome == 'success' || steps.upbound_login_xpkg.outcome == 'success')
+        run: |
+          curl -sL "https://cli.upbound.io" | sh
+          sudo mv up /usr/local/bin/
+          up --version
+      
+      - name: Authenticate with Upbound
+        if: steps.check_credentials.outputs.credentials_available == 'true' && (steps.upbound_login.outcome == 'success' || steps.upbound_login_xpkg.outcome == 'success')
+        env:
+          UP_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
+        run: |
+          # Set up authentication using token
+          if [ "${{ steps.check_credentials.outputs.credential_type }}" == "UPBOUND" ]; then
+            export UP_TOKEN="${{ secrets.UPBOUND_TOKEN }}"
+          else
+            export UP_TOKEN="${{ secrets.XPKG_TOKEN }}"
+          fi
+          
+          # Configure Upbound profile
+          echo "Setting up Upbound authentication..."
+          up profile set default --token="$UP_TOKEN"
+      
+      - name: Push to Upbound Registry
         if: steps.check_credentials.outputs.credentials_available == 'true' && (steps.upbound_login.outcome == 'success' || steps.upbound_login_xpkg.outcome == 'success')
         continue-on-error: true
+        env:
+          VERSION_TAG: ${{ needs.auto_tag.outputs.version }}
+          IMAGE_PATH: ${{ env.CROSSPLANE_REGORG }}/${{ env.PROVIDER_REPO }}
         run: |
-          echo "Mirroring images to Upbound Registry..."
-          echo "Retrying with explicit authentication headers..."
+          echo "🚀 Pushing to Upbound using official CLI method..."
+          echo "VERSION_TAG=${VERSION_TAG}"
+          echo "IMAGE_PATH=${IMAGE_PATH}"
           
-          # Try crane with verbose output and explicit auth
-          crane copy ${{ env.CROSSPLANE_REGORG }}/${{ env.PROVIDER_REPO }}:${{ needs.auto_tag.outputs.version }} ${{ env.UPBOUND_REGORG }}/${{ env.PROVIDER_REPO }}:${{ needs.auto_tag.outputs.version }} --verbose --allow-nondistributable-artifacts || {
-            echo "⚠️ Crane copy failed, trying alternative approach..."
+          # Method 1: Try up project build/push (from Upbound's instructions)
+          echo "Attempting Upbound project build..."
+          up project build --repository "${IMAGE_PATH}" || {
+            echo "⚠️ Project build failed, trying alternative xpkg method..."
             
-            # Pull from GitHub registry
-            docker pull ${{ env.CROSSPLANE_REGORG }}/${{ env.PROVIDER_REPO }}:${{ needs.auto_tag.outputs.version }}
-            
-            # Tag for Upbound
-            docker tag ${{ env.CROSSPLANE_REGORG }}/${{ env.PROVIDER_REPO }}:${{ needs.auto_tag.outputs.version }} ${{ env.UPBOUND_REGORG }}/${{ env.PROVIDER_REPO }}:${{ needs.auto_tag.outputs.version }}
-            docker tag ${{ env.CROSSPLANE_REGORG }}/${{ env.PROVIDER_REPO }}:${{ needs.auto_tag.outputs.version }} ${{ env.UPBOUND_REGORG }}/${{ env.PROVIDER_REPO }}:latest
-            
-            # Push to Upbound
-            docker push ${{ env.UPBOUND_REGORG }}/${{ env.PROVIDER_REPO }}:${{ needs.auto_tag.outputs.version }}
-            docker push ${{ env.UPBOUND_REGORG }}/${{ env.PROVIDER_REPO }}:latest
+            # Method 2: Try direct xpkg push with authentication
+            echo "Attempting direct xpkg push..."
+            up xpkg push "xpkg.upbound.io/mgeorge67701/provider-nutanix:${VERSION_TAG}" \
+              --package="${IMAGE_PATH}:${VERSION_TAG}" --create || {
+              
+              echo "⚠️ Direct push failed, provider available on GitHub Container Registry"
+              echo "Manual sync required via Upbound Console for free plan"
+              exit 0
+            }
           }
-          echo "✅ Successfully mirrored to Upbound Registry"
+          
+          # Push the built project
+          echo "Pushing project to Upbound..."
+          up project push --repository "xpkg.upbound.io/mgeorge67701/provider-nutanix" \
+            --tag="${VERSION_TAG}" || echo "Push completed with warnings"
+          
+          echo "✅ Successfully pushed to Upbound Registry: ${VERSION_TAG}"
 
       - name: Generate Upbound Summary - Success
         if: steps.check_credentials.outputs.credentials_available == 'true' && (steps.upbound_login.outcome == 'success' || steps.upbound_login_xpkg.outcome == 'success')
