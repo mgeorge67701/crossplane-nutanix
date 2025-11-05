@@ -301,7 +301,7 @@ jobs:
         run: |
           curl -sL https://cli.upbound.io | sh
           sudo mv up /usr/local/bin/
-          up --version
+          up version
 
       - name: Login to Upbound Registry
         if: steps.check_credentials.outputs.credentials_available == 'true'
