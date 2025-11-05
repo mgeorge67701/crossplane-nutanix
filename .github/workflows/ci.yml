@@ -277,25 +277,17 @@ jobs:
       - name: Check Upbound Credentials
         id: check_credentials
         run: |
-          # Check both possible secret name patterns
+          # Check for Personal Access Token credentials
           if [ -n "${{ secrets.UPBOUND_ACCESS_ID }}" ] && [ -n "${{ secrets.UPBOUND_TOKEN }}" ]; then
             echo "credentials_available=true" >> $GITHUB_OUTPUT
-            echo "credential_type=UPBOUND" >> $GITHUB_OUTPUT
-            echo "✅ Upbound credentials are available (UPBOUND_ACCESS_ID found)"
-            echo "🔍 Access ID format: ${{ secrets.UPBOUND_ACCESS_ID }}"
+            echo "✅ Upbound credentials are available (Personal Access Token)"
+            echo "🔍 Access ID: ${{ secrets.UPBOUND_ACCESS_ID }}"
             TOKEN_LENGTH=$(echo "${{ secrets.UPBOUND_TOKEN }}" | wc -c)
-            echo "🔍 Token length: ${TOKEN_LENGTH} characters"
-          elif [ -n "${{ secrets.XPKG_ACCESS_ID }}" ] && [ -n "${{ secrets.XPKG_TOKEN }}" ]; then
-            echo "credentials_available=true" >> $GITHUB_OUTPUT
-            echo "credential_type=XPKG" >> $GITHUB_OUTPUT
-            echo "✅ Upbound credentials are available (XPKG_ACCESS_ID found)"
-            echo "🔍 Access ID format: ${{ secrets.XPKG_ACCESS_ID }}"
-            TOKEN_LENGTH=$(echo "${{ secrets.XPKG_TOKEN }}" | wc -c)
             echo "🔍 Token length: ${TOKEN_LENGTH} characters"
           else
             echo "credentials_available=false" >> $GITHUB_OUTPUT
-            echo "⚠️ Upbound credentials not found - skipping mirror step"
-            echo "Expected secrets: UPBOUND_ACCESS_ID + UPBOUND_TOKEN or XPKG_ACCESS_ID + XPKG_TOKEN"
+            echo "⚠️ Upbound credentials not found - skipping Upbound publishing"
+            echo "Expected secrets: UPBOUND_ACCESS_ID + UPBOUND_TOKEN (Personal Access Token)"
           fi
 
       - name: Setup crane
@@ -338,15 +330,11 @@ jobs:
         env:
           UP_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
         run: |
-          # Set up authentication using token
-          if [ "${{ steps.check_credentials.outputs.credential_type }}" == "UPBOUND" ]; then
-            export UP_TOKEN="${{ secrets.UPBOUND_TOKEN }}"
-          else
-            export UP_TOKEN="${{ secrets.XPKG_TOKEN }}"
-          fi
+          # Set up authentication using Personal Access Token
+          echo "Setting up Upbound authentication with Personal Access Token..."
+          export UP_TOKEN="${{ secrets.UPBOUND_TOKEN }}"
           
           # Configure Upbound profile
-          echo "Setting up Upbound authentication..."
           up profile set default --token="$UP_TOKEN"
       
       - name: Push to Upbound Registry
