@@ -57,7 +57,7 @@ IMAGES = $(PROJECT_NAME)
 # ====================================================================================
 # Setup XPKG
 
-XPKG_REG_ORGS ?= ghcr.io/mgeorge67701
+XPKG_REG_ORGS ?= ghcr.io/mgeorge67701 xpkg.upbound.io/mgeorge67701
 # NOTE(hasheddan): skip promoting on xpkg.upbound.io as channel tags are
 # inferred.
 XPKG_REG_ORGS_NO_PROMOTE ?= xpkg.upbound.io/mgeorge67701
