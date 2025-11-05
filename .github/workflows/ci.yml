@@ -144,20 +144,15 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache: true
 
-      - name: Build Multi-Arch Docker Image
+      - name: Build All Artifacts (Multi-Arch Docker Images and Packages)
         run: |
-          echo "Building multi-arch image with buildx..."
+          echo "Building multi-arch images and packages..."
           
-          # Build and push for multiple platforms using Makefile
-          make XPKG_REG_ORGS="${{ env.CROSSPLANE_REGORG }}" VERSION="${{ needs.auto_tag.outputs.version }}" docker.build docker.push
+          # Build all artifacts including multi-arch Docker images and packages
+          make XPKG_REG_ORGS="${{ env.CROSSPLANE_REGORG }}" VERSION="${{ needs.auto_tag.outputs.version }}" build.all
         env:
           # Use buildx for multi-arch builds
-          BUILD_ARGS: "--platform linux/amd64,linux/arm64 --push"
-
-      - name: Build Crossplane Package
-        run: |
-          # Build the .xpkg package
-          make XPKG_REG_ORGS="${{ env.CROSSPLANE_REGORG }}" VERSION="${{ needs.auto_tag.outputs.version }}" build.all
+          BUILD_ARGS: "--push"
 
       - name: Upload Artifacts to GitHub
         uses: actions/upload-artifact@v4
@@ -165,8 +160,9 @@ jobs:
           name: output
           path: _output/**
 
-      - name: Publish to GitHub Container Registry
+      - name: Publish to Registries
         run: |
+          echo "Publishing to registries..."
           make XPKG_REG_ORGS="${{ env.CROSSPLANE_REGORG }}" VERSION="${{ needs.auto_tag.outputs.version }}" publish
 
       - name: Create GitHub Release
