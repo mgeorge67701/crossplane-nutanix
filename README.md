@@ -8,6 +8,7 @@ A [Crossplane](https://crossplane.io/) provider for managing Nutanix resources. 
 
 - **Virtual Machine Management**: Create, update, and delete Nutanix VMs
 - **Multi-Architecture Support**: Native support for AMD64 and ARM64 platforms (Intel/AMD, Apple Silicon, AWS Graviton, Raspberry Pi 5)
+- **Multi-Registry Publishing**: Available on both GitHub Container Registry and Upbound Marketplace
 - **Multi-Datacenter Support**: Configure different Prism Central endpoints for different datacenters
 - **Dynamic Resource Resolution**: Automatically resolve cluster, subnet, and image UUIDs from names
 - **Flexible Authentication**: Support for datacenter-specific credentials
