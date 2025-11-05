@@ -186,8 +186,8 @@ jobs:
           # Update the image reference in crossplane package
           sed -i "s|ghcr.io/${{ github.repository_owner }}/provider-nutanix:.*|ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}|g" package/crossplane.yaml || true
           
-          # Build the .xpkg package using Crossplane tools
-          make XPKG_REG_ORGS="${{ env.CROSSPLANE_REGORG }}" VERSION="${{ needs.auto_tag.outputs.version }}" xpkg
+          # Build the .xpkg package using the correct Crossplane target
+          make XPKG_REG_ORGS="${{ env.CROSSPLANE_REGORG }}" VERSION="${{ needs.auto_tag.outputs.version }}" xpkg.build.provider-nutanix
 
       - name: Verify Multi-Arch Build
         run: |
