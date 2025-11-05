@@ -106,20 +106,23 @@ jobs:
       - name: Log in to GitHub Container Registry
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
-      - name: Build and push multi-arch controller image
-        uses: docker/build-push-action@v6
-        with:
-          builder: ${{ steps.buildx.outputs.name }}
-          context: .
-          push: true
-          platforms: linux/amd64,linux/arm64
-          tags: |
-            ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}
-            ghcr.io/${{ github.repository_owner }}/provider-nutanix:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          provenance: false
-          sbom: false
+      - name: Build and push multi-arch controller image (manual buildx)
+        run: |
+          echo "Building multi-arch image manually with buildx..."
+          
+          # Create and use the multiarch builder
+          docker buildx create --name multiarch --driver docker-container --use || true
+          docker buildx inspect --bootstrap
+          
+          # Build and push for multiple platforms
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            --push \
+            --tag ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} \
+            --tag ghcr.io/${{ github.repository_owner }}/provider-nutanix:latest \
+            .
+          
+          echo "Multi-arch build completed!"
 
       - name: Verify multi-arch build and ensure availability
         run: |
