@@ -23,6 +23,10 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: '1.21'
+          cache: true
+
+      - name: Download dependencies
+        run: go mod download
 
       - name: Run tests
         run: go test ./...
@@ -100,12 +104,21 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Wait for image availability
+        run: |
+          echo "Waiting for multi-arch image to be available..."
+          sleep 10
+          docker pull ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}
+
       - name: Install Upbound CLI
         run: |
           curl -sL https://cli.upbound.io | sh
           sudo mv up /usr/local/bin/
           which up
           up --help | head -5
+
+      - name: Login to GitHub Container Registry for xpkg
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
       - name: Login to Upbound Registry
         env:
@@ -125,9 +138,6 @@ jobs:
             --package-root=crossplane-package \
             --controller=ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} \
             -o provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
-
-      - name: Login to GitHub Container Registry
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
       - name: Push to GitHub Container Registry
         run: |
