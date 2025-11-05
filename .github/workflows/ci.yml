@@ -93,7 +93,7 @@ jobs:
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
       - name: Build and push multi-arch controller image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           push: true
@@ -103,12 +103,15 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/provider-nutanix:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          outputs: type=image,name=target,annotation-index.org.opencontainers.image.description=Multi-arch Crossplane Nutanix Provider
 
-      - name: Wait for image availability
+      - name: Verify multi-arch build
         run: |
-          echo "Waiting for multi-arch image to be available..."
+          echo "Verifying multi-arch image build..."
           sleep 10
-          docker pull ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}
+          docker buildx imagetools inspect ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}
+          echo "Checking for both AMD64 and ARM64 platforms..."
+          docker buildx imagetools inspect ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} | grep -E "(linux/amd64|linux/arm64)"
 
       - name: Install Upbound CLI
         run: |
