@@ -5,75 +5,20 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: write
+  packages: write
+
 jobs:
-  build-and-release:
+  release:
+    name: Release Multi-Arch Provider
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-        id: buildx
         with:
-          name: multiarch-builder
-          platforms: linux/amd64,linux/arm64
-          use: true
-
-      - name: Debug buildx setup
-        run: |
-          echo "Available builders:"
-          docker buildx ls
-          echo "Current builder details:"
-          docker buildx inspect
-          echo "Supported platforms:"
-          docker buildx inspect --bootstrap | grep Platforms
-
-      - name: Log in to GitHub Container Registry
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-
-      - name: Build and push multi-arch controller image (manual buildx)
-        run: |
-          echo "Building multi-arch image manually with buildx..."
-          
-          # Create and use the multiarch builder
-          docker buildx create --name multiarch --driver docker-container --use || true
-          docker buildx inspect --bootstrap
-          
-          # Build and push for multiple platforms
-          docker buildx build \
-            --platform linux/amd64,linux/arm64 \
-            --push \
-            --tag ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ github.ref_name }} \
-            .
-          
-          echo "Multi-arch build completed!"
-
-      - name: Verify multi-arch build and ensure availability
-        run: |
-          echo "Verifying multi-arch image build..."
-          sleep 15
-          
-          # Retry mechanism for image inspection
-          for i in {1..5}; do
-            echo "Attempt $i: Checking image availability..."
-            if docker buildx imagetools inspect ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ github.ref_name }}; then
-              echo "✅ Image is available!"
-              break
-            else
-              echo "⏳ Image not ready yet, waiting 10 seconds..."
-              sleep 10
-            fi
-          done
-          
-          echo "Checking for both AMD64 and ARM64 platforms..."
-          docker buildx imagetools inspect ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ github.ref_name }} | grep -E "(linux/amd64|linux/arm64)" || echo "⚠️  Platform check failed, but proceeding..."
-          
-          echo "Attempting to pull image to ensure it's accessible..."
-          docker pull ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ github.ref_name }}
+          fetch-depth: 0
+          submodules: true
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -81,44 +26,43 @@ jobs:
           go-version: '1.21'
           cache: true
 
-      - name: Download dependencies
-        run: go mod download
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install Upbound CLI
         run: |
           curl -sL https://cli.upbound.io | sh
-          sudo mv $HOME/.up/bin/up /usr/local/bin/
-          up --help | head -5
+          sudo mv up /usr/local/bin/
 
-      - name: Login to Upbound Registry
+      - name: Login to Upbound Registry (if configured)
         env:
           UPBOUND_ACCESS_ID: ${{ secrets.UPBOUND_ACCESS_ID }}
           UPBOUND_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
         run: |
           if [ -n "$UPBOUND_ACCESS_ID" ] && [ -n "$UPBOUND_TOKEN" ]; then
-            up login --username="${UPBOUND_ACCESS_ID}" --password="${UPBOUND_TOKEN}"
+            up login --username="$UPBOUND_ACCESS_ID" --password="$UPBOUND_TOKEN"
             echo "Successfully logged in to Upbound"
           else
-            echo "Upbound credentials not found, will skip Upbound registry push"
+            echo "Upbound credentials not configured, will skip Upbound registry push"
           fi
 
-      - name: Build Crossplane package
+      - name: Build and Publish Multi-Arch Release
+        env:
+          VERSION: ${{ github.ref_name }}
         run: |
-          up xpkg build --package-root=crossplane-package --controller=ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ github.ref_name }}
-          
-      - name: Push to GitHub Container Registry
-        run: |
-          up xpkg push ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ github.ref_name }} -f crossplane-package/*.xpkg
+          echo "Building and publishing multi-architecture release: $VERSION"
+          make publish VERSION=$VERSION
 
-      - name: Push to Upbound Registry
-        run: |
-          up xpkg push xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:${{ github.ref_name }} -f crossplane-package/*.xpkg
-
-      - name: Upload release assets
+      - name: Upload Release Assets
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            crossplane-package/*.xpkg
-            crossplane-package/*.yaml
+          files: _output/xpkg/**/*.xpkg
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

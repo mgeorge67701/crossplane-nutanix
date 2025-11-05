@@ -3,6 +3,8 @@ name: CI
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -10,14 +12,15 @@ permissions:
   packages: write
 
 jobs:
-  test:
-    name: Test
+  ci:
+    name: Continuous Integration
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          submodules: true
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -25,139 +28,78 @@ jobs:
           go-version: '1.21'
           cache: true
 
-      - name: Download dependencies
-        run: go mod download
+      - name: Run Crossplane CI checks
+        run: make reviewable
 
-      - name: Run tests
-        run: go test ./...
-
-      - name: Run vet
-        run: go vet ./...
-
-  auto_tag:
-    name: Auto Tag
+  publish:
+    name: Publish Multi-Arch Release
     runs-on: ubuntu-latest
-    needs: test
-    outputs:
-      version: ${{ steps.set_version.outputs.version }}
+    needs: ci
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          submodules: true
 
-      - name: Determine version
-        id: set_version
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+          cache: true
+
+      - name: Auto-increment version
+        id: version
         run: |
+          # Get the latest tag
           LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.3.6")
-          COMMITS_SINCE_TAG=$(git log ${LAST_TAG}..HEAD --oneline || true)
+          echo "Last tag: $LAST_TAG"
           
-          if [ -n "$COMMITS_SINCE_TAG" ]; then
-            # Extract version numbers
+          # Check if there are new commits since the last tag
+          COMMITS_SINCE_TAG=$(git log ${LAST_TAG}..HEAD --oneline | wc -l)
+          echo "Commits since last tag: $COMMITS_SINCE_TAG"
+          
+          if [ "$COMMITS_SINCE_TAG" -gt 0 ]; then
+            # Extract version numbers and increment patch
             ver=${LAST_TAG#v}
             IFS='.' read -r major minor patch <<< "$ver"
             major=${major:-0}
             minor=${minor:-0}
             patch=${patch:-0}
             
-            # Auto-increment patch version
             patch=$((patch+1))
             NEW_TAG="v${major}.${minor}.${patch}"
             
-            echo "New version: $NEW_TAG (previous: $LAST_TAG)"
+            # Create and push the new tag
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git tag $NEW_TAG
             git push origin $NEW_TAG
             
             echo "version=${NEW_TAG}" >> $GITHUB_OUTPUT
+            echo "NEW VERSION: $NEW_TAG"
           else
             echo "No new commits, using existing version: $LAST_TAG"
             echo "version=${LAST_TAG}" >> $GITHUB_OUTPUT
           fi
 
-  package:
-    name: Build and Publish Multi-Arch
-    runs-on: ubuntu-latest
-    needs: auto_tag
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-        id: buildx
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
         with:
-          name: multiarch-builder
-          platforms: linux/amd64,linux/arm64
-          use: true
-
-      - name: Debug buildx setup
-        run: |
-          echo "Available builders:"
-          docker buildx ls
-          echo "Current builder details:"
-          docker buildx inspect
-          echo "Supported platforms:"
-          docker buildx inspect --bootstrap | grep Platforms
-
-      - name: Log in to GitHub Container Registry
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-
-      - name: Build and push multi-arch controller image (manual buildx)
-        run: |
-          echo "Building multi-arch image manually with buildx..."
-          
-          # Create and use the multiarch builder
-          docker buildx create --name multiarch --driver docker-container --use || true
-          docker buildx inspect --bootstrap
-          
-          # Build and push for multiple platforms
-          docker buildx build \
-            --platform linux/amd64,linux/arm64 \
-            --push \
-            --tag ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} \
-            --tag ghcr.io/${{ github.repository_owner }}/provider-nutanix:latest \
-            .
-          
-          echo "Multi-arch build completed!"
-
-      - name: Verify multi-arch build and ensure availability
-        run: |
-          echo "Verifying multi-arch image build..."
-          sleep 15
-          
-          # Retry mechanism for image inspection
-          for i in {1..5}; do
-            echo "Attempt $i: Checking image availability..."
-            if docker buildx imagetools inspect ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}; then
-              echo "✅ Image is available!"
-              break
-            else
-              echo "⏳ Image not ready yet, waiting 10 seconds..."
-              sleep 10
-            fi
-          done
-          
-          echo "Checking for both AMD64 and ARM64 platforms..."
-          docker buildx imagetools inspect ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} | grep -E "(linux/amd64|linux/arm64)" || echo "⚠️  Platform check failed, but proceeding..."
-          
-          echo "Attempting to pull image to ensure it's accessible..."
-          docker pull ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install Upbound CLI
         run: |
           curl -sL https://cli.upbound.io | sh
           sudo mv up /usr/local/bin/
-          which up
-          up --help | head -5
 
-      - name: Login to GitHub Container Registry for xpkg
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-
-      - name: Login to Upbound Registry
+      - name: Login to Upbound Registry (if configured)
         env:
           UPBOUND_ACCESS_ID: ${{ secrets.UPBOUND_ACCESS_ID }}
           UPBOUND_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
@@ -166,70 +108,45 @@ jobs:
             up login --username="$UPBOUND_ACCESS_ID" --password="$UPBOUND_TOKEN"
             echo "Successfully logged in to Upbound"
           else
-            echo "Upbound credentials not found, will skip Upbound registry push"
+            echo "Upbound credentials not configured, will skip Upbound registry push"
           fi
 
-      - name: Build Crossplane package
-        run: |
-          up xpkg build \
-            --package-root=crossplane-package \
-            --controller=ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} \
-            -o provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
-
-      - name: Push to GitHub Container Registry
-        run: |
-          up xpkg push ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} \
-            -f provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
-          up xpkg push ghcr.io/${{ github.repository_owner }}/provider-nutanix:latest \
-            -f provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
-
-      - name: Push to Upbound Registry
+      - name: Build and Publish Multi-Arch Release
         env:
-          UPBOUND_ACCESS_ID: ${{ secrets.UPBOUND_ACCESS_ID }}
-          UPBOUND_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          if [ -n "$UPBOUND_ACCESS_ID" ] && [ -n "$UPBOUND_TOKEN" ]; then
-            up xpkg push xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} \
-              -f provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
-            up xpkg push xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:latest \
-              -f provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
-          else
-            echo "Upbound credentials not found, skipping Upbound registry push"
-          fi
+          echo "Building and publishing multi-architecture release: $VERSION"
+          make publish VERSION=$VERSION
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ needs.auto_tag.outputs.version }}
-          name: Release ${{ needs.auto_tag.outputs.version }}
+          tag_name: ${{ steps.version.outputs.version }}
+          name: Release ${{ steps.version.outputs.version }}
           body: |
-            ## Multi-Architecture Crossplane Nutanix Provider ${{ needs.auto_tag.outputs.version }}
+            ## Multi-Architecture Crossplane Nutanix Provider ${{ steps.version.outputs.version }}
+            
+            This release provides multi-architecture support for AMD64 and ARM64 platforms.
             
             ### Installation
             
-            **From Upbound Marketplace:**
-            ```bash
-            kubectl crossplane install provider xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}
-            ```
-            
             **From GitHub Container Registry:**
             ```bash
-            kubectl crossplane install provider ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}
+            kubectl crossplane install provider ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ steps.version.outputs.version }}
+            ```
+            
+            **From Upbound Marketplace:**
+            ```bash
+            kubectl crossplane install provider xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:${{ steps.version.outputs.version }}
             ```
             
             ### Supported Architectures
-            - linux/amd64 (Intel/AMD)
-            - linux/arm64 (Apple Silicon, AWS Graviton, Raspberry Pi 5)
+            - `linux/amd64` - Intel/AMD processors
+            - `linux/arm64` - Apple Silicon, AWS Graviton, Raspberry Pi 5
             
-            ### Registries
-            - **GitHub Container Registry**: `ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}`
-            - **Upbound Marketplace**: `xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}`
-          files: provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
+            ### Available Registries
+            - **GitHub Container Registry**: `ghcr.io/${{ github.repository_owner }}/provider-nutanix`
+            - **Upbound Marketplace**: `xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix`
+          files: _output/xpkg/**/*.xpkg
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload package artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: crossplane-package
-          path: provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
