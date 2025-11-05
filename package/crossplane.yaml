@@ -33,6 +33,8 @@ metadata:
       For detailed documentation and examples, visit:
       [GitHub Repository](https://github.com/mgeorge67701/crossplane-nutanix)
 spec:
+  controller:
+    image: ghcr.io/mgeorge67701/provider-nutanix:latest
   crds:
     - file: nutanix.crossplane.io_providerconfigs.yaml
     - file: nutanix.crossplane.io_virtualmachines.yaml

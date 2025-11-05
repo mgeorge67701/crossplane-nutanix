@@ -183,11 +183,17 @@ jobs:
       - name: Build Crossplane Package
         run: |
           echo "Building Crossplane package..."
-          # Update the image reference in crossplane package
+          # Update the image reference in crossplane package to use the pushed multi-arch image
           sed -i "s|ghcr.io/${{ github.repository_owner }}/provider-nutanix:.*|ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}|g" package/crossplane.yaml || true
           
-          # Build the .xpkg package using the correct Crossplane target
-          make XPKG_REG_ORGS="${{ env.CROSSPLANE_REGORG }}" VERSION="${{ needs.auto_tag.outputs.version }}" xpkg.build.provider-nutanix
+          # Wait a moment for image to be available
+          sleep 5
+          
+          # Verify the multi-arch image is available
+          docker manifest inspect ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} || echo "Image not yet available"
+          
+          # Build the .xpkg package using the pushed multi-arch image
+          make XPKG_REG_ORGS="${{ env.CROSSPLANE_REGORG }}" VERSION="${{ needs.auto_tag.outputs.version }}" IMAGES="ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}" xpkg.build.provider-nutanix
 
       - name: Verify Multi-Arch Build
         run: |
