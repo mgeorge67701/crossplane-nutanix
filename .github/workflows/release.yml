@@ -37,7 +37,8 @@ jobs:
       - name: Install Upbound CLI
         run: |
           curl -sL https://cli.upbound.io | sh
-          echo "$HOME/.up/bin" >> $GITHUB_PATH
+          sudo mv $HOME/.up/bin/up /usr/local/bin/
+          up --help | head -5
           
       - name: Login to GitHub Container Registry for Upbound
         run: echo "${{ secrets.GITHUB_TOKEN }}" | up registry login ghcr.io -u ${{ github.actor }} --password-stdin
