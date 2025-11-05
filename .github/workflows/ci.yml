@@ -35,6 +35,17 @@ jobs:
           paths_ignore: '["**.md", "**.png", "**.jpg"]'
           do_not_skip: '["workflow_dispatch", "schedule", "push"]'
 
+      - name: Generate Skip Detection Summary
+        run: |
+          echo "## 🔍 Skip Duplicate Actions" >> $GITHUB_STEP_SUMMARY
+          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Should Skip** | ${{ steps.noop.outputs.should_skip }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Reason** | ${{ steps.noop.outputs.reason || 'do_not_skip' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Trigger** | ${{ github.event_name }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "_Job summary generated at $(date)_" >> $GITHUB_STEP_SUMMARY
+
   ci:
     name: Continuous Integration
     runs-on: ubuntu-latest
@@ -58,6 +69,18 @@ jobs:
           make generate
           make lint
           make build
+
+      - name: Generate CI Summary
+        run: |
+          echo "## ✅ Continuous Integration" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Code Generation** | ✅ Completed |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Linting** | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Build** | ✅ Successful |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Go Version** | ${{ env.GO_VERSION }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "_CI checks completed at $(date)_" >> $GITHUB_STEP_SUMMARY
 
   auto_tag:
     name: Auto Tag Release
@@ -108,6 +131,18 @@ jobs:
             echo "VERSION=${LAST_TAG}" >> $GITHUB_OUTPUT
           fi
 
+      - name: Generate Auto Tag Summary
+        run: |
+          echo "## 🏷️ Auto Tag Release" >> $GITHUB_STEP_SUMMARY
+          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Version** | ${{ steps.version.outputs.VERSION }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Previous Tag** | $(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || 'None') |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Commits Since Last** | $(git log $(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || 'HEAD')..HEAD --oneline | wc -l || 0) |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Branch** | ${{ github.ref_name }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "_Version tagged at $(date)_" >> $GITHUB_STEP_SUMMARY
+
   publish-artifacts:
     name: Build and Publish Multi-Arch
     runs-on: ubuntu-latest
@@ -154,6 +189,23 @@ jobs:
           # Use buildx for multi-arch builds
           BUILD_ARGS: "--push"
 
+      - name: Generate Build Summary
+        run: |
+          echo "## 🔨 Multi-Architecture Build" >> $GITHUB_STEP_SUMMARY
+          echo "| Component | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Docker Images** | ✅ Built & Pushed |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Architectures** | linux/amd64, linux/arm64 |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Crossplane Package** | ✅ Generated |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Version** | ${{ needs.auto_tag.outputs.version }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Registry** | ${{ env.CROSSPLANE_REGORG }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 Image Details" >> $GITHUB_STEP_SUMMARY
+          echo "- **GitHub Container Registry**: \`ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Platforms Supported**: Intel/AMD, Apple Silicon, AWS Graviton, Raspberry Pi 5" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "_Build completed at $(date)_" >> $GITHUB_STEP_SUMMARY
+
       - name: Upload Artifacts to GitHub
         uses: actions/upload-artifact@v4
         with:
@@ -164,6 +216,20 @@ jobs:
         run: |
           echo "Publishing to registries..."
           make XPKG_REG_ORGS="${{ env.CROSSPLANE_REGORG }}" VERSION="${{ needs.auto_tag.outputs.version }}" publish
+
+      - name: Generate Publish Summary
+        run: |
+          echo "## 📤 Registry Publishing" >> $GITHUB_STEP_SUMMARY
+          echo "| Registry | Status | URL |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|--------|-----|" >> $GITHUB_STEP_SUMMARY
+          echo "| **GitHub Container Registry** | ✅ Published | [\`ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}\`](https://ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}) |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🚀 Installation Command" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "kubectl crossplane install provider ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "_Published at $(date)_" >> $GITHUB_STEP_SUMMARY
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -195,6 +261,23 @@ jobs:
           files: _output/xpkg/linux_amd64/provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate Release Summary
+        run: |
+          echo "## 🎉 GitHub Release Created" >> $GITHUB_STEP_SUMMARY
+          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Release Tag** | [${{ needs.auto_tag.outputs.version }}](https://github.com/${{ github.repository }}/releases/tag/${{ needs.auto_tag.outputs.version }}) |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Artifacts** | ✅ .xpkg package included |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Multi-Arch** | ✅ AMD64 + ARM64 |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Raspberry Pi 5** | ✅ Supported |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🚀 Quick Install" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "kubectl crossplane install provider ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "_Release created at $(date)_" >> $GITHUB_STEP_SUMMARY
 
   mirror-to-upbound:
     name: Mirror to Upbound Registry
@@ -236,21 +319,57 @@ jobs:
           crane copy ${{ env.CROSSPLANE_REGORG }}/${{ env.PROVIDER_REPO }}:${{ needs.auto_tag.outputs.version }} ${{ env.UPBOUND_REGORG }}/${{ env.PROVIDER_REPO }}:latest --allow-nondistributable-artifacts
           echo "✅ Successfully mirrored to Upbound Registry"
 
-      - name: Handle Upbound Issues
+      - name: Generate Upbound Summary - Success
+        if: steps.check_credentials.outputs.credentials_available == 'true' && steps.upbound_login.outcome == 'success'
+        run: |
+          echo "## 🔄 Upbound Registry Mirror" >> $GITHUB_STEP_SUMMARY
+          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Status** | ✅ Success |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Access ID** | ${{ secrets.UPBOUND_ACCESS_ID }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Registry** | xpkg.upbound.io |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Package URL** | [\`xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}\`](https://marketplace.upbound.io/providers/${{ github.repository_owner }}/provider-nutanix) |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 Dual Registry Availability" >> $GITHUB_STEP_SUMMARY
+          echo "- **GitHub**: \`ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Upbound**: \`xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "_Mirrored at $(date)_" >> $GITHUB_STEP_SUMMARY
+
+      - name: Generate Upbound Summary - Failed
         if: steps.check_credentials.outputs.credentials_available == 'true' && (steps.upbound_login.outcome != 'success' || steps.upbound_login.outcome == 'failure')
         run: |
-          echo "⚠️ Upbound Registry access failed - this is non-critical"
-          echo "Possible causes:"
-          echo "  - Credentials may need to be refreshed"
-          echo "  - Upbound registry may be temporarily unavailable"
-          echo "  - Access ID format may have changed"
-          echo ""
-          echo "✅ GitHub Container Registry publishing completed successfully"
-          echo "Your multi-arch images are available at: ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}"
+          echo "## ⚠️ Upbound Registry Mirror" >> $GITHUB_STEP_SUMMARY
+          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Status** | ⚠️ Failed (Non-Critical) |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Access ID** | ${{ secrets.UPBOUND_ACCESS_ID }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Reason** | Authentication Failed |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔧 Troubleshooting" >> $GITHUB_STEP_SUMMARY
+          echo "- Credentials may need to be refreshed" >> $GITHUB_STEP_SUMMARY
+          echo "- Upbound registry may be temporarily unavailable" >> $GITHUB_STEP_SUMMARY
+          echo "- Access ID format may have changed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### ✅ GitHub Registry Still Available" >> $GITHUB_STEP_SUMMARY
+          echo "Your multi-arch images are available at:" >> $GITHUB_STEP_SUMMARY
+          echo "\`ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "_Status checked at $(date)_" >> $GITHUB_STEP_SUMMARY
 
-      - name: Skip Upbound Mirror
+      - name: Generate Upbound Summary - Skipped
         if: steps.check_credentials.outputs.credentials_available == 'false'
         run: |
-          echo "⚠️ Skipping Upbound Registry mirror - credentials not configured"
-          echo "To enable Upbound mirroring, add UPBOUND_ACCESS_ID and UPBOUND_TOKEN secrets to your GitHub repository"
+          echo "## ⏭️ Upbound Registry Mirror" >> $GITHUB_STEP_SUMMARY
+          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Status** | ⏭️ Skipped |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Reason** | Credentials Not Configured |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔑 To Enable Upbound Mirroring" >> $GITHUB_STEP_SUMMARY
+          echo "Add these secrets to your GitHub repository:" >> $GITHUB_STEP_SUMMARY
+          echo "- \`UPBOUND_ACCESS_ID\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`UPBOUND_TOKEN\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "_Status checked at $(date)_" >> $GITHUB_STEP_SUMMARY
 
