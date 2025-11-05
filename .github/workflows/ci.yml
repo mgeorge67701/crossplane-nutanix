@@ -35,17 +35,6 @@ jobs:
           paths_ignore: '["**.md", "**.png", "**.jpg"]'
           do_not_skip: '["workflow_dispatch", "schedule", "push"]'
 
-      - name: Generate Skip Detection Summary
-        run: |
-          echo "## 🔍 Skip Duplicate Actions" >> $GITHUB_STEP_SUMMARY
-          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
-          echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| **Should Skip** | ${{ steps.noop.outputs.should_skip }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Reason** | ${{ steps.noop.outputs.reason || 'do_not_skip' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Trigger** | ${{ github.event_name }} |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "_Job summary generated at $(date)_" >> $GITHUB_STEP_SUMMARY
-
   ci:
     name: Continuous Integration
     runs-on: ubuntu-latest
@@ -288,20 +277,27 @@ jobs:
       - name: Check Upbound Credentials
         id: check_credentials
         run: |
+          # Check both possible secret name patterns
           if [ -n "${{ secrets.UPBOUND_ACCESS_ID }}" ] && [ -n "${{ secrets.UPBOUND_TOKEN }}" ]; then
             echo "credentials_available=true" >> $GITHUB_OUTPUT
-            echo "✅ Upbound credentials are available (Access ID: ${{ secrets.UPBOUND_ACCESS_ID }})"
+            echo "credential_type=UPBOUND" >> $GITHUB_OUTPUT
+            echo "✅ Upbound credentials are available (UPBOUND_ACCESS_ID found)"
+          elif [ -n "${{ secrets.XPKG_ACCESS_ID }}" ] && [ -n "${{ secrets.XPKG_TOKEN }}" ]; then
+            echo "credentials_available=true" >> $GITHUB_OUTPUT
+            echo "credential_type=XPKG" >> $GITHUB_OUTPUT
+            echo "✅ Upbound credentials are available (XPKG_ACCESS_ID found)"
           else
             echo "credentials_available=false" >> $GITHUB_OUTPUT
             echo "⚠️ Upbound credentials not found - skipping mirror step"
+            echo "Expected secrets: UPBOUND_ACCESS_ID + UPBOUND_TOKEN or XPKG_ACCESS_ID + XPKG_TOKEN"
           fi
 
       - name: Setup crane
         if: steps.check_credentials.outputs.credentials_available == 'true'
         uses: imjasonh/setup-crane@v0.4
 
-      - name: Login to Upbound Registry
-        if: steps.check_credentials.outputs.credentials_available == 'true'
+      - name: Login to Upbound Registry (UPBOUND credentials)
+        if: steps.check_credentials.outputs.credentials_available == 'true' && steps.check_credentials.outputs.credential_type == 'UPBOUND'
         continue-on-error: true
         id: upbound_login
         uses: docker/login-action@v3
@@ -310,8 +306,18 @@ jobs:
           username: ${{ secrets.UPBOUND_ACCESS_ID }}
           password: ${{ secrets.UPBOUND_TOKEN }}
 
+      - name: Login to Upbound Registry (XPKG credentials)
+        if: steps.check_credentials.outputs.credentials_available == 'true' && steps.check_credentials.outputs.credential_type == 'XPKG'
+        continue-on-error: true
+        id: upbound_login_xpkg
+        uses: docker/login-action@v3
+        with:
+          registry: "xpkg.upbound.io"
+          username: ${{ secrets.XPKG_ACCESS_ID }}
+          password: ${{ secrets.XPKG_TOKEN }}
+
       - name: Mirror to Upbound Registry
-        if: steps.check_credentials.outputs.credentials_available == 'true' && steps.upbound_login.outcome == 'success'
+        if: steps.check_credentials.outputs.credentials_available == 'true' && (steps.upbound_login.outcome == 'success' || steps.upbound_login_xpkg.outcome == 'success')
         continue-on-error: true
         run: |
           echo "Mirroring images to Upbound Registry..."
@@ -320,13 +326,17 @@ jobs:
           echo "✅ Successfully mirrored to Upbound Registry"
 
       - name: Generate Upbound Summary - Success
-        if: steps.check_credentials.outputs.credentials_available == 'true' && steps.upbound_login.outcome == 'success'
+        if: steps.check_credentials.outputs.credentials_available == 'true' && (steps.upbound_login.outcome == 'success' || steps.upbound_login_xpkg.outcome == 'success')
         run: |
           echo "## 🔄 Upbound Registry Mirror" >> $GITHUB_STEP_SUMMARY
           echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
           echo "| **Status** | ✅ Success |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Access ID** | ${{ secrets.UPBOUND_ACCESS_ID }} |" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.check_credentials.outputs.credential_type }}" == "UPBOUND" ]; then
+            echo "| **Access ID** | ${{ secrets.UPBOUND_ACCESS_ID }} |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| **Access ID** | ${{ secrets.XPKG_ACCESS_ID }} |" >> $GITHUB_STEP_SUMMARY
+          fi
           echo "| **Registry** | xpkg.upbound.io |" >> $GITHUB_STEP_SUMMARY
           echo "| **Package URL** | [\`xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}\`](https://marketplace.upbound.io/providers/${{ github.repository_owner }}/provider-nutanix) |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -337,19 +347,24 @@ jobs:
           echo "_Mirrored at $(date)_" >> $GITHUB_STEP_SUMMARY
 
       - name: Generate Upbound Summary - Failed
-        if: steps.check_credentials.outputs.credentials_available == 'true' && (steps.upbound_login.outcome != 'success' || steps.upbound_login.outcome == 'failure')
+        if: steps.check_credentials.outputs.credentials_available == 'true' && (steps.upbound_login.outcome == 'failure' || steps.upbound_login_xpkg.outcome == 'failure')
         run: |
           echo "## ⚠️ Upbound Registry Mirror" >> $GITHUB_STEP_SUMMARY
           echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
           echo "| **Status** | ⚠️ Failed (Non-Critical) |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Access ID** | ${{ secrets.UPBOUND_ACCESS_ID }} |" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.check_credentials.outputs.credential_type }}" == "UPBOUND" ]; then
+            echo "| **Access ID** | ${{ secrets.UPBOUND_ACCESS_ID }} |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| **Access ID** | ${{ secrets.XPKG_ACCESS_ID }} |" >> $GITHUB_STEP_SUMMARY
+          fi
           echo "| **Reason** | Authentication Failed |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 🔧 Troubleshooting" >> $GITHUB_STEP_SUMMARY
           echo "- Credentials may need to be refreshed" >> $GITHUB_STEP_SUMMARY
           echo "- Upbound registry may be temporarily unavailable" >> $GITHUB_STEP_SUMMARY
           echo "- Access ID format may have changed" >> $GITHUB_STEP_SUMMARY
+          echo "- Try re-generating credentials at https://console.upbound.io" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### ✅ GitHub Registry Still Available" >> $GITHUB_STEP_SUMMARY
           echo "Your multi-arch images are available at:" >> $GITHUB_STEP_SUMMARY
