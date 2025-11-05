@@ -7,6 +7,7 @@ A [Crossplane](https://crossplane.io/) provider for managing Nutanix resources. 
 ## Features
 
 - **Virtual Machine Management**: Create, update, and delete Nutanix VMs
+- **Multi-Architecture Support**: Native support for AMD64 and ARM64 platforms (Intel/AMD, Apple Silicon, AWS Graviton, Raspberry Pi 5)
 - **Multi-Datacenter Support**: Configure different Prism Central endpoints for different datacenters
 - **Dynamic Resource Resolution**: Automatically resolve cluster, subnet, and image UUIDs from names
 - **Flexible Authentication**: Support for datacenter-specific credentials
@@ -18,30 +19,30 @@ A [Crossplane](https://crossplane.io/) provider for managing Nutanix resources. 
 
 ### 1. Install the Provider
 
-**Option 1: Using kubectl (Recommended - Latest Stable)**
+**Option 1: From Upbound Marketplace (Recommended for Community)**
+
+```bash
+kubectl crossplane install provider xpkg.upbound.io/mgeorge67701/provider-nutanix:v0.3.6
+```
+
+**Option 2: From GitHub Container Registry**
+
+```bash
+kubectl crossplane install provider ghcr.io/mgeorge67701/provider-nutanix:v0.3.6
+```
+
+**Option 3: Using kubectl manifest**
 
 ```bash
 kubectl apply -f - <<EOF
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
-  name: mgeorge67701-provider-nutanix
+  name: provider-nutanix
 spec:
-  package: ghcr.io/mgeorge67701/provider-nutanix:v0.3.0
+  package: xpkg.upbound.io/mgeorge67701/provider-nutanix:v0.3.6
   packagePullPolicy: Always
 EOF
-```
-
-**Option 2: Using Crossplane CLI (GitHub Container Registry)**
-
-```bash
-kubectl crossplane install provider ghcr.io/mgeorge67701/provider-nutanix:v0.3.0
-```
-
-**Option 3: Using Upbound Marketplace**
-
-```bash
-kubectl crossplane install provider xpkg.upbound.io/mgeorge67701/provider-nutanix:v0.3.0
 ```
 
 **Verify Installation**
@@ -384,165 +385,68 @@ This diagram shows how Crossplane, your custom Nutanix provider controller, and 
 - kubectl
 - Crossplane CLI (`kubectl crossplane`)
 
-### Building
+### Multi-Architecture Building
 
-**Using Make (Recommended)**
+This provider supports **AMD64** and **ARM64** architectures, working natively on Intel/AMD systems, Apple Silicon Macs, AWS Graviton instances, and Raspberry Pi 5.
+
+#### Quick Build Commands
 
 ```bash
-# Show all available commands
-make help
+# Build multi-arch images locally (no push)
+make multi-build
 
-# Build and test
-make test
-make docker-build
-make xpkg-build
+# Build and push to registry
+make multi-build-push
 
-# Complete release (build multi-platform image and package)
-make release VERSION=v1.0.0
+# Test multi-arch build
+make multi-build-test
 
-# Install provider in current cluster
-make install VERSION=v1.0.0
-
-# Check provider status
-make status
+# Show version info
+make version-info
 ```
 
-**Manual Building**
-
-**Single Architecture (local development):**
+#### Manual Multi-Architecture Build
 
 ```bash
-# Build the Docker image
-docker build -t ghcr.io/mgeorge67701/provider-nutanix:latest .
-
-# Build the Crossplane package (xpkg)
-up xpkg build --package-root=crossplane-package --controller=ghcr.io/mgeorge67701/provider-nutanix:latest -o provider-nutanix-latest.xpkg
-
-# Push both the container image and package
-docker push ghcr.io/mgeorge67701/provider-nutanix:latest
-up xpkg push ghcr.io/mgeorge67701/provider-nutanix:latest -f provider-nutanix-latest.xpkg
-```
-
-**Multi-Architecture Build (Production - Latest: v0.3.0)**
-
-> **✅ CONFIRMED WORKING**: Both GHCR and Upbound registries work with this approach
-
-```bash
-echo $GITHUB_TOKEN | docker login ghcr.io -u mgeorge67701 --password-stdin
-up login
 # Set your version
-export VERSION=v0.3.0
+export VERSION=v0.3.6
 
-# Step 1: Build and push multi-architecture controller image (with -controller suffix)
-make docker-buildx VERSION=${VERSION}
-# This runs: docker buildx build --platform linux/amd64,linux/arm64 -t ghcr.io/mgeorge67701/provider-nutanix:v0.3.0-controller --push .
-
-# Step 2: Build Crossplane package using the controller image
-make xpkg-build VERSION=${VERSION}
-# This runs: up xpkg build --package-root=crossplane-package --controller=ghcr.io/mgeorge67701/provider-nutanix:v0.3.0-controller -o provider-nutanix-v0.3.0.xpkg
-
-# Step 3: Push to GHCR (GitHub Container Registry)
-make xpkg-push VERSION=${VERSION}
-# This runs: up xpkg push ghcr.io/mgeorge67701/provider-nutanix:v0.3.0 -f provider-nutanix-v0.3.0.xpkg
-
-# OR Step 3: Push to Upbound Registry (alternative)
-up xpkg push xpkg.upbound.io/mgeorge67701/provider-nutanix:${VERSION} -f provider-nutanix-${VERSION}.xpkg
-
-# Step 4: Create a GitHub release
-# First, create and push a git tag
-git tag ${VERSION}
-git push origin ${VERSION}
-
-# Set your GitHub token (create one at https://github.com/settings/tokens)
-# with 'repo' scope for private repos or 'public_repo' for public repos
-export GITHUB_TOKEN=your_token_here
-
-# Create the release using GitHub API
-curl -X POST -H "Authorization: Bearer $GITHUB_TOKEN" \
-  -H "Accept: application/vnd.github.v3+json" \
-  -H "Content-Type: application/json" \
-  "https://api.github.com/repos/mgeorge67701/crossplane-nutanix/releases" \
-  -d "{
-    \"tag_name\": \"${VERSION}\",
-    \"name\": \"${VERSION}\",
-    \"body\": \"Release ${VERSION} of provider-nutanix\\n\\n## What's Changed\\n- Provider package built and published to ghcr.io/mgeorge67701/provider-nutanix:${VERSION}-controller\\n- Package also available on Upbound registry: xpkg.upbound.io/mgeorge67701/provider-nutanix:${VERSION}\",
-    \"draft\": false,
-    \"prerelease\": false,
-    \"generate_release_notes\": true
-  }"
-```
-
-**Manual Multi-Architecture Commands (without Make):**
-
-```bash
-# Set version
-export VERSION=v0.3.0
-
-# Step 1: Setup Docker Buildx (one-time setup)
-docker buildx create --name multiarch --driver docker-container --bootstrap --use
-
-# Step 2: Build and push multi-architecture controller image
+# Build and push multi-arch image
 docker buildx build \
   --platform linux/amd64,linux/arm64 \
-  --tag ghcr.io/mgeorge67701/provider-nutanix:${VERSION}-controller \
-  --push \
-  .
+  --tag ghcr.io/mgeorge67701/provider-nutanix:${VERSION} \
+  --push .
 
-# Step 3: Build Crossplane package using controller image
+# Build Crossplane package
 up xpkg build \
   --package-root=crossplane-package \
-  --controller=ghcr.io/mgeorge67701/provider-nutanix:${VERSION}-controller \
+  --controller=ghcr.io/mgeorge67701/provider-nutanix:${VERSION} \
   -o provider-nutanix-${VERSION}.xpkg
 
-# Step 4: Push Crossplane package to GHCR
-up xpkg push ghcr.io/mgeorge67701/provider-nutanix:${VERSION} -f provider-nutanix-${VERSION}.xpkg
-
-# Optional: Push to Upbound Registry
-up xpkg push xpkg.upbound.io/mgeorge67701/provider-nutanix:${VERSION} -f provider-nutanix-${VERSION}.xpkg
-
-# Step 5: Create GitHub Release
-git tag ${VERSION}
-git push origin ${VERSION}
-
-# Set your GitHub token (if not already set)
-export GITHUB_TOKEN=your_token_here
-
-# Create the release with release notes
-curl -X POST -H "Authorization: Bearer $GITHUB_TOKEN" \
-  -H "Accept: application/vnd.github.v3+json" \
-  -H "Content-Type: application/json" \
-  "https://api.github.com/repos/mgeorge67701/crossplane-nutanix/releases" \
-  -d "{
-    \"tag_name\": \"${VERSION}\",
-    \"name\": \"${VERSION}\",
-    \"body\": \"Release ${VERSION} of provider-nutanix\\n\\n## What's Changed\\n- Provider package built and published to ghcr.io/mgeorge67701/provider-nutanix:${VERSION}-controller\\n- Package also available on Upbound registry: xpkg.upbound.io/mgeorge67701/provider-nutanix:${VERSION}\",
-    \"draft\": false,
-    \"prerelease\": false,
-    \"generate_release_notes\": true
-  }"
+# Push to both registries
+up xpkg push ghcr.io/mgeorge67701/provider-nutanix:${VERSION} \
+  -f provider-nutanix-${VERSION}.xpkg
+up xpkg push xpkg.upbound.io/mgeorge67701/provider-nutanix:${VERSION} \
+  -f provider-nutanix-${VERSION}.xpkg
 ```
 
-**Verify Multi-Architecture Build:**
+#### Verify Multi-Architecture Support
 
 ```bash
-# Check controller image has both architectures
-docker buildx imagetools inspect ghcr.io/mgeorge67701/provider-nutanix:v0.3.0-controller
+# Inspect multi-arch manifest
+docker buildx imagetools inspect ghcr.io/mgeorge67701/provider-nutanix:v0.3.6
 
-# Test deployment from GHCR (recommended)
-kubectl patch provider.pkg.crossplane.io mgeorge67701-provider-nutanix --type='merge' -p='{"spec":{"package":"ghcr.io/mgeorge67701/provider-nutanix:v0.3.0"}}'
-kubectl get provider.pkg.crossplane.io mgeorge67701-provider-nutanix
-
-# Test deployment from Upbound Registry (alternative)
-kubectl patch provider.pkg.crossplane.io mgeorge67701-provider-nutanix --type='merge' -p='{"spec":{"package":"xpkg.upbound.io/mgeorge67701/provider-nutanix:v0.3.0"}}'
-kubectl get provider.pkg.crossplane.io mgeorge67701-provider-nutanix
+# Should show both:
+# Platform: linux/amd64
+# Platform: linux/arm64
 ```
 
-**Test Results (Confirmed Working - Latest Release):**
-- ✅ **GHCR v0.3.0**: `ghcr.io/mgeorge67701/provider-nutanix:v0.3.0` → INSTALLED: True, HEALTHY: True
-- ✅ **Upbound v0.3.0**: `xpkg.upbound.io/mgeorge67701/provider-nutanix:v0.3.0` → INSTALLED: True, HEALTHY: True
-- ✅ **Multi-arch**: Both linux/amd64 and linux/arm64 platforms supported
-- ✅ **Pod Status**: Running successfully with proper entrypoint
-- ✅ **GitHub Release**: Available at [v0.3.0](https://github.com/mgeorge67701/crossplane-nutanix/releases/tag/v0.3.0)
+#### Supported Platforms
+
+- **linux/amd64** - Intel/AMD 64-bit (traditional servers, desktops)
+- **linux/arm64** - ARM 64-bit (Apple Silicon, AWS Graviton, Raspberry Pi 5)
+
+When deployed to Kubernetes, the correct architecture is automatically selected for each node.
 
 ### Testing
 
@@ -556,64 +460,41 @@ go run cmd/provider/main.go --debug
 
 ### Releasing
 
-This project uses automated versioning and releases via GitHub Actions:
+**Automated Release (Recommended):**
+```bash
+# Create and push a version tag - CI/CD handles the rest
+git tag v1.0.0
+git push origin v1.0.0
+```
 
-1. **Create a git tag**: The CI pipeline will detect the tag and build/publish automatically
-   ```bash
-   git tag v1.0.0
-   git push origin v1.0.0
-   ```
+**Manual Release:**
+```bash
+# Build and push to both registries
+export VERSION=v1.0.0
+make release VERSION=${VERSION}
 
-2. **Manual Release**: For manual releases, follow these steps:
-   ```bash
-   # Build and push Docker image
-   docker buildx build --platform linux/amd64,linux/arm64 -t ghcr.io/mgeorge67701/provider-nutanix:v1.0.0-controller --push .
-   
-   # Build and push Crossplane package
-   up xpkg build --package-root=crossplane-package --controller=ghcr.io/mgeorge67701/provider-nutanix:v1.0.0-controller -o provider-nutanix-v1.0.0.xpkg
-   up xpkg push ghcr.io/mgeorge67701/provider-nutanix:v1.0.0 -f provider-nutanix-v1.0.0.xpkg
-   
-   # Create GitHub Release (set GITHUB_TOKEN environment variable first)
-   curl -X POST -H "Authorization: Bearer $GITHUB_TOKEN" \
-     -H "Accept: application/vnd.github.v3+json" \
-     -H "Content-Type: application/json" \
-     "https://api.github.com/repos/mgeorge67701/crossplane-nutanix/releases" \
-     -d "{
-       \"tag_name\": \"v1.0.0\",
-       \"name\": \"v1.0.0\",
-       \"body\": \"Release v1.0.0 of provider-nutanix\\n\\n## What's Changed\\n- Provider package built and published to ghcr.io/mgeorge67701/provider-nutanix:v1.0.0-controller\\n- Package also available on Upbound registry: xpkg.upbound.io/mgeorge67701/provider-nutanix:v1.0.0\",
-       \"draft\": false,
-       \"prerelease\": false,
-       \"generate_release_notes\": true
-     }"
-   ```
+# Or step by step:
+make multi-build-push VERSION=${VERSION}
+make xpkg-build VERSION=${VERSION}
+make xpkg-push-all VERSION=${VERSION}  # Pushes to both GHCR and Upbound
+```
 
-3. **Available Versions**: Check [GitHub Releases](https://github.com/mgeorge67701/crossplane-nutanix/releases) for all available versions
+**Registry Locations:**
+- **GitHub Container Registry**: `ghcr.io/mgeorge67701/provider-nutanix:VERSION`
+- **Upbound Marketplace**: `xpkg.upbound.io/mgeorge67701/provider-nutanix:VERSION`
 
-### Publishing to Upbound Marketplace
+The GitHub Actions workflow automatically builds multi-architecture images and publishes to both registries when you push a version tag, making the provider available to the community through the Upbound Marketplace.
 
-To publish your provider to the Upbound Marketplace (like provider-kubernetes):
+#### Setting up Upbound Credentials
 
-1. **Set up Upbound credentials** in GitHub Secrets:
+To enable automatic publishing to Upbound Marketplace, add these GitHub repository secrets:
+
+1. Go to your GitHub repository → Settings → Secrets and Variables → Actions
+2. Add these secrets:
    - `UPBOUND_ACCESS_ID`: Your Upbound access ID
    - `UPBOUND_TOKEN`: Your Upbound token
 
-2. **Create a release** - the CI/CD will automatically publish to both:
-   - GitHub Container Registry: `ghcr.io/mgeorge67701/provider-nutanix:VERSION`
-   - Upbound Registry: `xpkg.upbound.io/mgeorge67701/provider-nutanix:VERSION`
-
-3. **Your provider will appear** in the Upbound Marketplace at:
-   `https://marketplace.upbound.io/providers/mgeorge67701/provider-nutanix`
-
-**Manual publish to Upbound**:
-```bash
-# Login to Upbound
-up login
-
-# Build and push package
-up xpkg build --package-root=crossplane-package --controller=ghcr.io/mgeorge67701/provider-nutanix:v1.0.0 -o provider.xpkg
-up xpkg push xpkg.upbound.io/mgeorge67701/provider-nutanix:v1.0.0 -f provider.xpkg
-```
+Get your credentials from [Upbound Console](https://console.upbound.io/) → Account → API Tokens.
 
 ## Troubleshooting
 
