@@ -182,18 +182,16 @@ jobs:
             kubectl crossplane install provider ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}
             ```
             
-            **From Upbound Marketplace:**
-            ```bash
-            kubectl crossplane install provider xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}
-            ```
-            
             ### Supported Architectures
             - `linux/amd64` - Intel/AMD processors
             - `linux/arm64` - Apple Silicon, AWS Graviton, Raspberry Pi 5
             
             ### Available Registries
             - **GitHub Container Registry**: `ghcr.io/${{ github.repository_owner }}/provider-nutanix`
-            - **Upbound Marketplace**: `xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix`
+            
+            ---
+            
+            *Note: If you have Upbound credentials configured, this package is also available on the Upbound Marketplace.*
           files: _output/xpkg/linux_amd64/provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -204,26 +202,40 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
+      - name: Check Upbound Credentials
+        id: check_credentials
+        run: |
+          if [ -n "${{ secrets.UPBOUND_ACCESS_ID }}" ] && [ -n "${{ secrets.UPBOUND_TOKEN }}" ]; then
+            echo "credentials_available=true" >> $GITHUB_OUTPUT
+            echo "✅ Upbound credentials are available"
+          else
+            echo "credentials_available=false" >> $GITHUB_OUTPUT
+            echo "⚠️ Upbound credentials not found - skipping mirror step"
+          fi
+
       - name: Setup crane
+        if: steps.check_credentials.outputs.credentials_available == 'true'
         uses: imjasonh/setup-crane@v0.4
 
       - name: Login to Upbound Registry
+        if: steps.check_credentials.outputs.credentials_available == 'true'
         uses: docker/login-action@v3
         with:
           registry: "xpkg.upbound.io"
           username: ${{ secrets.UPBOUND_ACCESS_ID }}
           password: ${{ secrets.UPBOUND_TOKEN }}
-        if: env.UPBOUND_ACCESS_ID != '' && env.UPBOUND_TOKEN != ''
-        env:
-          UPBOUND_ACCESS_ID: ${{ secrets.UPBOUND_ACCESS_ID }}
-          UPBOUND_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
 
       - name: Mirror to Upbound Registry
+        if: steps.check_credentials.outputs.credentials_available == 'true'
         run: |
+          echo "Mirroring images to Upbound Registry..."
           crane copy ${{ env.CROSSPLANE_REGORG }}/${{ env.PROVIDER_REPO }}:${{ needs.auto_tag.outputs.version }} ${{ env.UPBOUND_REGORG }}/${{ env.PROVIDER_REPO }}:${{ needs.auto_tag.outputs.version }} --allow-nondistributable-artifacts
           crane copy ${{ env.CROSSPLANE_REGORG }}/${{ env.PROVIDER_REPO }}:${{ needs.auto_tag.outputs.version }} ${{ env.UPBOUND_REGORG }}/${{ env.PROVIDER_REPO }}:latest --allow-nondistributable-artifacts
-        if: env.UPBOUND_ACCESS_ID != '' && env.UPBOUND_TOKEN != ''
-        env:
-          UPBOUND_ACCESS_ID: ${{ secrets.UPBOUND_ACCESS_ID }}
-          UPBOUND_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
+          echo "✅ Successfully mirrored to Upbound Registry"
+
+      - name: Skip Upbound Mirror
+        if: steps.check_credentials.outputs.credentials_available == 'false'
+        run: |
+          echo "⚠️ Skipping Upbound Registry mirror - credentials not configured"
+          echo "To enable Upbound mirroring, add UPBOUND_ACCESS_ID and UPBOUND_TOKEN secrets to your GitHub repository"
 
