@@ -104,6 +104,8 @@ jobs:
         run: |
           curl -sL https://cli.upbound.io | sh
           sudo mv up /usr/local/bin/
+          which up
+          up --version
 
       - name: Login to GitHub Container Registry for Upbound
         run: echo "${{ secrets.GITHUB_TOKEN }}" | up registry login ghcr.io -u ${{ github.actor }} --password-stdin
