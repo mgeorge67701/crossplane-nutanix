@@ -228,25 +228,6 @@ jobs:
           name: output
           path: provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
 
-      - name: Publish to Registries
-        run: |
-          echo "Publishing to registries..."
-          make XPKG_REG_ORGS="${{ env.CROSSPLANE_REGORG }}" VERSION="${{ needs.auto_tag.outputs.version }}" publish
-
-      - name: Generate Publish Summary
-        run: |
-          echo "## 📤 Registry Publishing" >> $GITHUB_STEP_SUMMARY
-          echo "| Registry | Status | URL |" >> $GITHUB_STEP_SUMMARY
-          echo "|----------|--------|-----|" >> $GITHUB_STEP_SUMMARY
-          echo "| **GitHub Container Registry** | ✅ Published | [\`ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}\`](https://ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}) |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 🚀 Installation Command" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
-          echo "kubectl crossplane install provider ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "_Published at $(date)_" >> $GITHUB_STEP_SUMMARY
-
       - name: Download .xpkg for Release
         uses: actions/download-artifact@v4
         with:
