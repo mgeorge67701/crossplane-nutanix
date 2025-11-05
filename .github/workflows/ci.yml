@@ -268,121 +268,92 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "_Release created at $(date)_" >> $GITHUB_STEP_SUMMARY
 
-  mirror-to-upbound:
-    name: Mirror to Upbound Registry
+  publish-to-upbound:
+    name: Publish to Upbound Registry
     needs: [publish-artifacts, auto_tag]
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download .xpkg artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: output
+          path: _output
+
       - name: Check Upbound Credentials
         id: check_credentials
         run: |
-          # Check for Personal Access Token credentials
           if [ -n "${{ secrets.UPBOUND_ACCESS_ID }}" ] && [ -n "${{ secrets.UPBOUND_TOKEN }}" ]; then
             echo "credentials_available=true" >> $GITHUB_OUTPUT
-            echo "✅ Upbound credentials are available (Personal Access Token)"
-            echo "🔍 Access ID: ${{ secrets.UPBOUND_ACCESS_ID }}"
-            TOKEN_LENGTH=$(echo "${{ secrets.UPBOUND_TOKEN }}" | wc -c)
-            echo "🔍 Token length: ${TOKEN_LENGTH} characters"
+            echo "✅ Upbound credentials are available"
           else
             echo "credentials_available=false" >> $GITHUB_OUTPUT
             echo "⚠️ Upbound credentials not found - skipping Upbound publishing"
-            echo "Expected secrets: UPBOUND_ACCESS_ID + UPBOUND_TOKEN (Personal Access Token)"
           fi
 
-      - name: Setup crane
-        if: steps.check_credentials.outputs.credentials_available == 'true'
-        uses: imjasonh/setup-crane@v0.4
-
-      - name: Login to Upbound Registry (UPBOUND credentials)
-        if: steps.check_credentials.outputs.credentials_available == 'true' && steps.check_credentials.outputs.credential_type == 'UPBOUND'
-        continue-on-error: true
-        id: upbound_login
-        uses: docker/login-action@v3
-        with:
-          registry: "xpkg.upbound.io"
-          username: ${{ secrets.UPBOUND_ACCESS_ID }}
-          password: ${{ secrets.UPBOUND_TOKEN }}
-        env:
-          DOCKER_CONFIG: ${{ runner.temp }}/.docker
-
-      - name: Login to Upbound Registry (XPKG credentials)
-        if: steps.check_credentials.outputs.credentials_available == 'true' && steps.check_credentials.outputs.credential_type == 'XPKG'
-        continue-on-error: true
-        id: upbound_login_xpkg
-        uses: docker/login-action@v3
-        with:
-          registry: "xpkg.upbound.io"
-          username: ${{ secrets.XPKG_ACCESS_ID }}
-          password: ${{ secrets.XPKG_TOKEN }}
-        env:
-          DOCKER_CONFIG: ${{ runner.temp }}/.docker
-
       - name: Install Upbound CLI
-        if: steps.check_credentials.outputs.credentials_available == 'true' && (steps.upbound_login.outcome == 'success' || steps.upbound_login_xpkg.outcome == 'success')
+        if: steps.check_credentials.outputs.credentials_available == 'true'
         run: |
-          curl -sL "https://cli.upbound.io" | sh
+          curl -sL https://cli.upbound.io | sh
           sudo mv up /usr/local/bin/
           up --version
-      
-      - name: Authenticate with Upbound
-        if: steps.check_credentials.outputs.credentials_available == 'true' && (steps.upbound_login.outcome == 'success' || steps.upbound_login_xpkg.outcome == 'success')
-        env:
-          UP_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
+
+      - name: Login to Upbound Registry
+        if: steps.check_credentials.outputs.credentials_available == 'true'
         run: |
-          # Set up authentication using Personal Access Token
-          echo "Setting up Upbound authentication with Personal Access Token..."
-          export UP_TOKEN="${{ secrets.UPBOUND_TOKEN }}"
+          up login --username="${{ secrets.UPBOUND_ACCESS_ID }}" --password="${{ secrets.UPBOUND_TOKEN }}"
+
+      - name: Login to GitHub Container Registry for .xpkg
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Push .xpkg to GitHub Container Registry
+        run: |
+          # Find the .xpkg file
+          XPKG_FILE=$(find _output -name "provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg" | head -1)
+          if [ -z "$XPKG_FILE" ]; then
+            echo "❌ Could not find .xpkg file"
+            exit 1
+          fi
           
-          # Configure Upbound profile
-          up profile set default --token="$UP_TOKEN"
-      
+          echo "📦 Found package: $XPKG_FILE"
+          
+          # Push .xpkg to GitHub Container Registry
+          echo "🚀 Pushing .xpkg to GitHub Container Registry..."
+          up xpkg push ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} -f "$XPKG_FILE"
+          up xpkg push ghcr.io/${{ github.repository_owner }}/provider-nutanix:latest -f "$XPKG_FILE"
+
       - name: Push to Upbound Registry
-        if: steps.check_credentials.outputs.credentials_available == 'true' && (steps.upbound_login.outcome == 'success' || steps.upbound_login_xpkg.outcome == 'success')
-        continue-on-error: true
-        env:
-          VERSION_TAG: ${{ needs.auto_tag.outputs.version }}
-          IMAGE_PATH: ${{ env.CROSSPLANE_REGORG }}/${{ env.PROVIDER_REPO }}
+        if: steps.check_credentials.outputs.credentials_available == 'true'
         run: |
-          echo "🚀 Pushing to Upbound using official CLI method..."
-          echo "VERSION_TAG=${VERSION_TAG}"
-          echo "IMAGE_PATH=${IMAGE_PATH}"
+          # Find the .xpkg file
+          XPKG_FILE=$(find _output -name "provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg" | head -1)
+          if [ -z "$XPKG_FILE" ]; then
+            echo "❌ Could not find .xpkg file"
+            exit 1
+          fi
           
-          # Method 1: Try up project build/push (from Upbound's instructions)
-          echo "Attempting Upbound project build..."
-          up project build --repository "${IMAGE_PATH}" || {
-            echo "⚠️ Project build failed, trying alternative xpkg method..."
-            
-            # Method 2: Try direct xpkg push with authentication
-            echo "Attempting direct xpkg push..."
-            up xpkg push "xpkg.upbound.io/mgeorge67701/provider-nutanix:${VERSION_TAG}" \
-              --package="${IMAGE_PATH}:${VERSION_TAG}" --create || {
-              
-              echo "⚠️ Direct push failed, provider available on GitHub Container Registry"
-              echo "Manual sync required via Upbound Console for free plan"
-              exit 0
-            }
-          }
+          echo "📦 Found package: $XPKG_FILE"
           
-          # Push the built project
-          echo "Pushing project to Upbound..."
-          up project push --repository "xpkg.upbound.io/mgeorge67701/provider-nutanix" \
-            --tag="${VERSION_TAG}" || echo "Push completed with warnings"
+          # Push to Upbound Registry using the simple method
+          echo "🚀 Pushing to Upbound Registry..."
+          up xpkg push xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} -f "$XPKG_FILE"
+          up xpkg push xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:latest -f "$XPKG_FILE"
           
-          echo "✅ Successfully pushed to Upbound Registry: ${VERSION_TAG}"
+          echo "✅ Successfully pushed to Upbound Registry"
 
       - name: Generate Upbound Summary - Success
-        if: steps.check_credentials.outputs.credentials_available == 'true' && (steps.upbound_login.outcome == 'success' || steps.upbound_login_xpkg.outcome == 'success')
+        if: steps.check_credentials.outputs.credentials_available == 'true'
         run: |
-          echo "## 🔄 Upbound Registry Mirror" >> $GITHUB_STEP_SUMMARY
+          echo "## 🔄 Upbound Registry Publishing" >> $GITHUB_STEP_SUMMARY
           echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
           echo "| **Status** | ✅ Success |" >> $GITHUB_STEP_SUMMARY
-          if [ "${{ steps.check_credentials.outputs.credential_type }}" == "UPBOUND" ]; then
-            echo "| **Access ID** | ${{ secrets.UPBOUND_ACCESS_ID }} |" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "| **Access ID** | ${{ secrets.XPKG_ACCESS_ID }} |" >> $GITHUB_STEP_SUMMARY
-          fi
+          echo "| **Access ID** | ${{ secrets.UPBOUND_ACCESS_ID }} |" >> $GITHUB_STEP_SUMMARY
           echo "| **Registry** | xpkg.upbound.io |" >> $GITHUB_STEP_SUMMARY
           echo "| **Package URL** | [\`xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}\`](https://marketplace.upbound.io/providers/${{ github.repository_owner }}/provider-nutanix) |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -390,44 +361,18 @@ jobs:
           echo "- **GitHub**: \`ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- **Upbound**: \`xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "_Mirrored at $(date)_" >> $GITHUB_STEP_SUMMARY
-
-      - name: Generate Upbound Summary - Failed
-        if: steps.check_credentials.outputs.credentials_available == 'true' && (steps.upbound_login.outcome == 'failure' || steps.upbound_login_xpkg.outcome == 'failure')
-        run: |
-          echo "## ⚠️ Upbound Registry Mirror" >> $GITHUB_STEP_SUMMARY
-          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
-          echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| **Status** | ⚠️ Failed (Non-Critical) |" >> $GITHUB_STEP_SUMMARY
-          if [ "${{ steps.check_credentials.outputs.credential_type }}" == "UPBOUND" ]; then
-            echo "| **Access ID** | ${{ secrets.UPBOUND_ACCESS_ID }} |" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "| **Access ID** | ${{ secrets.XPKG_ACCESS_ID }} |" >> $GITHUB_STEP_SUMMARY
-          fi
-          echo "| **Reason** | Authentication Failed |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 🔧 Troubleshooting" >> $GITHUB_STEP_SUMMARY
-          echo "- Credentials may need to be refreshed" >> $GITHUB_STEP_SUMMARY
-          echo "- Upbound registry may be temporarily unavailable" >> $GITHUB_STEP_SUMMARY
-          echo "- Access ID format may have changed" >> $GITHUB_STEP_SUMMARY
-          echo "- Try re-generating credentials at https://console.upbound.io" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### ✅ GitHub Registry Still Available" >> $GITHUB_STEP_SUMMARY
-          echo "Your multi-arch images are available at:" >> $GITHUB_STEP_SUMMARY
-          echo "\`ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "_Status checked at $(date)_" >> $GITHUB_STEP_SUMMARY
+          echo "_Published at $(date)_" >> $GITHUB_STEP_SUMMARY
 
       - name: Generate Upbound Summary - Skipped
         if: steps.check_credentials.outputs.credentials_available == 'false'
         run: |
-          echo "## ⏭️ Upbound Registry Mirror" >> $GITHUB_STEP_SUMMARY
+          echo "## ⏭️ Upbound Registry Publishing" >> $GITHUB_STEP_SUMMARY
           echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
           echo "| **Status** | ⏭️ Skipped |" >> $GITHUB_STEP_SUMMARY
           echo "| **Reason** | Credentials Not Configured |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 🔑 To Enable Upbound Mirroring" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔑 To Enable Upbound Publishing" >> $GITHUB_STEP_SUMMARY
           echo "Add these secrets to your GitHub repository:" >> $GITHUB_STEP_SUMMARY
           echo "- \`UPBOUND_ACCESS_ID\`" >> $GITHUB_STEP_SUMMARY
           echo "- \`UPBOUND_TOKEN\`" >> $GITHUB_STEP_SUMMARY
