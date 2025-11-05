@@ -60,9 +60,35 @@ jobs:
           echo "Building and publishing multi-architecture release: $VERSION"
           make publish VERSION=$VERSION
 
-      - name: Upload Release Assets
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          body: |
+            ## Multi-Architecture Crossplane Nutanix Provider ${{ github.ref_name }}
+            
+            This release provides multi-architecture support for AMD64 and ARM64 platforms.
+            
+            ### Installation
+            
+            **From GitHub Container Registry:**
+            ```bash
+            kubectl crossplane install provider ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ github.ref_name }}
+            ```
+            
+            **From Upbound Marketplace:**
+            ```bash
+            kubectl crossplane install provider xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:${{ github.ref_name }}
+            ```
+            
+            ### Supported Architectures
+            - `linux/amd64` - Intel/AMD processors
+            - `linux/arm64` - Apple Silicon, AWS Graviton, Raspberry Pi 5
+            
+            ### Available Registries
+            - **GitHub Container Registry**: `ghcr.io/${{ github.repository_owner }}/provider-nutanix`
+            - **Upbound Marketplace**: `xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix`
           files: _output/xpkg/**/*.xpkg
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

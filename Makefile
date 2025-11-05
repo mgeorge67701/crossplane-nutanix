@@ -2,7 +2,7 @@
 # Setup Project
 
 PROJECT_NAME := provider-nutanix
-PROJECT_REPO := github.com/mgeorge67701/$(PROJECT_NAME)
+PROJECT_REPO := github.com/mgeorge67701/crossplane-nutanix
 
 PLATFORMS ?= linux_amd64 linux_arm64
 
@@ -30,9 +30,8 @@ NPROCS ?= 1
 GO_TEST_PARALLEL := $(shell echo $$(( $(NPROCS) / 2 )))
 
 GO_REQUIRED_VERSION ?= 1.21
-# Only build the provider binary we actually have
+# Only build the provider binary we actually have  
 GO_STATIC_PACKAGES = $(GO_PROJECT)/cmd/provider
-GO_LDFLAGS += -X $(GO_PROJECT)/internal/version.Version=$(VERSION)
 # Fix GO_SUBDIRS to match our actual project structure
 GO_SUBDIRS += cmd internal apis
 -include build/makelib/golang.mk

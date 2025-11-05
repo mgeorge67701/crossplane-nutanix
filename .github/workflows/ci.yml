@@ -35,8 +35,8 @@ jobs:
           make lint
           make build
 
-  publish:
-    name: Publish Multi-Arch Release
+  auto_tag:
+    name: Auto Tag Release
     runs-on: ubuntu-latest
     needs: ci
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -45,16 +45,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          submodules: true
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.21'
-          cache: true
-
-      - name: Auto-increment version
-        id: version
+      - name: Auto-increment version and create tag
         run: |
           # Get the latest tag
           LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.3.6")
@@ -75,82 +67,14 @@ jobs:
             patch=$((patch+1))
             NEW_TAG="v${major}.${minor}.${patch}"
             
-            # Create and push the new tag
+            echo "Creating new version: $NEW_TAG (previous: $LAST_TAG)"
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git tag $NEW_TAG
             git push origin $NEW_TAG
             
-            echo "version=${NEW_TAG}" >> $GITHUB_OUTPUT
-            echo "NEW VERSION: $NEW_TAG"
+            echo "✅ Created and pushed tag: $NEW_TAG"
           else
-            echo "No new commits, using existing version: $LAST_TAG"
-            echo "version=${LAST_TAG}" >> $GITHUB_OUTPUT
+            echo "No new commits since $LAST_TAG, skipping tag creation"
           fi
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Install Upbound CLI
-        run: |
-          curl -sL https://cli.upbound.io | sh
-          sudo mv up /usr/local/bin/
-
-      - name: Login to Upbound Registry (if configured)
-        env:
-          UPBOUND_ACCESS_ID: ${{ secrets.UPBOUND_ACCESS_ID }}
-          UPBOUND_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
-        run: |
-          if [ -n "$UPBOUND_ACCESS_ID" ] && [ -n "$UPBOUND_TOKEN" ]; then
-            up login --username="$UPBOUND_ACCESS_ID" --password="$UPBOUND_TOKEN"
-            echo "Successfully logged in to Upbound"
-          else
-            echo "Upbound credentials not configured, will skip Upbound registry push"
-          fi
-
-      - name: Build and Publish Multi-Arch Release
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
-        run: |
-          echo "Building and publishing multi-architecture release: $VERSION"
-          make publish VERSION=$VERSION
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.version.outputs.version }}
-          name: Release ${{ steps.version.outputs.version }}
-          body: |
-            ## Multi-Architecture Crossplane Nutanix Provider ${{ steps.version.outputs.version }}
-            
-            This release provides multi-architecture support for AMD64 and ARM64 platforms.
-            
-            ### Installation
-            
-            **From GitHub Container Registry:**
-            ```bash
-            kubectl crossplane install provider ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ steps.version.outputs.version }}
-            ```
-            
-            **From Upbound Marketplace:**
-            ```bash
-            kubectl crossplane install provider xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:${{ steps.version.outputs.version }}
-            ```
-            
-            ### Supported Architectures
-            - `linux/amd64` - Intel/AMD processors
-            - `linux/arm64` - Apple Silicon, AWS Graviton, Raspberry Pi 5
-            
-            ### Available Registries
-            - **GitHub Container Registry**: `ghcr.io/${{ github.repository_owner }}/provider-nutanix`
-            - **Upbound Marketplace**: `xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix`
-          files: _output/xpkg/**/*.xpkg
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
