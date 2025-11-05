@@ -14,6 +14,8 @@ env:
   CROSSPLANE_REGORG: 'ghcr.io/mgeorge67701'
   UPBOUND_REGORG: 'xpkg.upbound.io/mgeorge67701'
   PROVIDER_REPO: provider-nutanix
+  CROSSPLANE_CONTROLLER_IMAGE: 'ghcr.io/mgeorge67701/provider-nutanix-controller'
+  XPKG_GHCR_REPO: 'ghcr.io/mgeorge67701/provider-nutanix'
 
 permissions:
   contents: write
@@ -168,15 +170,15 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache: true
 
-      - name: Build Multi-Arch Docker Images
+      - name: Build Multi-Arch Controller Images
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
           platforms: linux/amd64,linux/arm64
           tags: |
-            ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}
-            ghcr.io/${{ github.repository_owner }}/provider-nutanix:latest
+            ${{ env.CROSSPLANE_CONTROLLER_IMAGE }}:${{ needs.auto_tag.outputs.version }}
+            ${{ env.CROSSPLANE_CONTROLLER_IMAGE }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -186,18 +188,22 @@ jobs:
           sudo mv up /usr/local/bin/
 
       - name: Build Crossplane Package
+        env:
+          CONTROLLER_IMAGE: ${{ env.CROSSPLANE_CONTROLLER_IMAGE }}
         run: |
           echo "Building Crossplane package with Upbound CLI..."
-          # Update the image reference in crossplane package to use our multi-arch image
-          sed -i "s|ghcr.io/${{ github.repository_owner }}/provider-nutanix:.*|ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}|g" package/crossplane.yaml
+          # Update the image reference in crossplane package to use our multi-arch controller image
+          sed -i "s|^\(\s*image: \).*|\1${CONTROLLER_IMAGE}:${{ needs.auto_tag.outputs.version }}|" package/crossplane.yaml
           
           # Build the .xpkg package directly with Upbound CLI to avoid Makefile issues
           up xpkg build --package-root=package -o provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
 
-      - name: Verify Multi-Arch Build
+      - name: Verify Multi-Arch Controller Image
+        env:
+          CONTROLLER_IMAGE: ${{ env.CROSSPLANE_CONTROLLER_IMAGE }}
         run: |
           echo "🔍 Verifying multi-arch build..."
-          docker manifest inspect ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} || echo "Manifest inspection failed"
+          docker manifest inspect ${CONTROLLER_IMAGE}:${{ needs.auto_tag.outputs.version }} || echo "Manifest inspection failed"
 
       - name: Generate Build Summary
         run: |
@@ -208,12 +214,12 @@ jobs:
           echo "| **Architectures** | linux/amd64, linux/arm64 |" >> $GITHUB_STEP_SUMMARY
           echo "| **Crossplane Package** | ✅ Generated |" >> $GITHUB_STEP_SUMMARY
           echo "| **Version** | ${{ needs.auto_tag.outputs.version }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Registry** | ${{ env.CROSSPLANE_REGORG }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Controller Image** | ${{ env.CROSSPLANE_CONTROLLER_IMAGE }}:${{ needs.auto_tag.outputs.version }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 📦 Multi-Arch Verification" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
           echo "# Verify multi-arch support:" >> $GITHUB_STEP_SUMMARY
-          echo "docker manifest inspect ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "docker manifest inspect ${{ env.CROSSPLANE_CONTROLLER_IMAGE }}:${{ needs.auto_tag.outputs.version }}" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 🚀 Supported Platforms" >> $GITHUB_STEP_SUMMARY
@@ -343,8 +349,8 @@ jobs:
           
           # Push .xpkg to GitHub Container Registry
           echo "🚀 Pushing .xpkg to GitHub Container Registry..."
-          up xpkg push ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} -f "$XPKG_FILE"
-          up xpkg push ghcr.io/${{ github.repository_owner }}/provider-nutanix:latest -f "$XPKG_FILE"
+          up xpkg push ${{ env.XPKG_GHCR_REPO }}:${{ needs.auto_tag.outputs.version }} -f "$XPKG_FILE"
+          up xpkg push ${{ env.XPKG_GHCR_REPO }}:latest -f "$XPKG_FILE"
 
       - name: Push to Upbound Registry
         if: steps.check_credentials.outputs.credentials_available == 'true'
