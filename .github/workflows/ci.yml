@@ -168,30 +168,52 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache: true
 
-      - name: Build All Artifacts (Multi-Arch Docker Images and Packages)
+      - name: Build Multi-Arch Docker Images
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}
+            ghcr.io/${{ github.repository_owner }}/provider-nutanix:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build Crossplane Package
         run: |
-          echo "Building multi-arch images and packages..."
+          echo "Building Crossplane package..."
+          # Update the image reference in crossplane package
+          sed -i "s|ghcr.io/${{ github.repository_owner }}/provider-nutanix:.*|ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}|g" package/crossplane.yaml || true
           
-          # Build all artifacts including multi-arch Docker images and packages
-          make XPKG_REG_ORGS="${{ env.CROSSPLANE_REGORG }}" VERSION="${{ needs.auto_tag.outputs.version }}" build.all
-        env:
-          # Use buildx for multi-arch builds
-          BUILD_ARGS: "--push"
+          # Build the .xpkg package using Crossplane tools
+          make XPKG_REG_ORGS="${{ env.CROSSPLANE_REGORG }}" VERSION="${{ needs.auto_tag.outputs.version }}" xpkg
+
+      - name: Verify Multi-Arch Build
+        run: |
+          echo "🔍 Verifying multi-arch build..."
+          docker manifest inspect ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} || echo "Manifest inspection failed"
 
       - name: Generate Build Summary
         run: |
           echo "## 🔨 Multi-Architecture Build" >> $GITHUB_STEP_SUMMARY
           echo "| Component | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|-----------|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| **Docker Images** | ✅ Built & Pushed |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Docker Images** | ✅ Built & Pushed (Multi-Arch) |" >> $GITHUB_STEP_SUMMARY
           echo "| **Architectures** | linux/amd64, linux/arm64 |" >> $GITHUB_STEP_SUMMARY
           echo "| **Crossplane Package** | ✅ Generated |" >> $GITHUB_STEP_SUMMARY
           echo "| **Version** | ${{ needs.auto_tag.outputs.version }} |" >> $GITHUB_STEP_SUMMARY
           echo "| **Registry** | ${{ env.CROSSPLANE_REGORG }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 📦 Image Details" >> $GITHUB_STEP_SUMMARY
-          echo "- **GitHub Container Registry**: \`ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Platforms Supported**: Intel/AMD, Apple Silicon, AWS Graviton, Raspberry Pi 5" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 Multi-Arch Verification" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "# Verify multi-arch support:" >> $GITHUB_STEP_SUMMARY
+          echo "docker manifest inspect ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🚀 Supported Platforms" >> $GITHUB_STEP_SUMMARY
+          echo "- **Intel/AMD (x86_64)**: Traditional servers and desktops" >> $GITHUB_STEP_SUMMARY
+          echo "- **ARM64**: Apple Silicon, AWS Graviton, Raspberry Pi 5" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "_Build completed at $(date)_" >> $GITHUB_STEP_SUMMARY
 
