@@ -7,14 +7,39 @@ on:
     branches: [main]
   workflow_dispatch:
 
+env:
+  GO_VERSION: '1.21'
+  DOCKER_BUILDX_VERSION: 'v0.22.0'
+  UP_VERSION: 'v0.38.4'
+  CROSSPLANE_REGORG: 'ghcr.io/mgeorge67701'
+  UPBOUND_REGORG: 'xpkg.upbound.io/mgeorge67701'
+  PROVIDER_REPO: provider-nutanix
+
 permissions:
   contents: write
   packages: write
+  attestations: write
+  id-token: write
 
 jobs:
+  detect-noop:
+    runs-on: ubuntu-latest
+    outputs:
+      noop: ${{ steps.noop.outputs.should_skip }}
+    steps:
+      - name: Detect No-op Changes
+        id: noop
+        uses: fkirc/skip-duplicate-actions@f75f66ce1886f00957d99748a42c724f4330bdcf # v5.3.1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          paths_ignore: '["**.md", "**.png", "**.jpg"]'
+          do_not_skip: '["workflow_dispatch", "schedule", "push"]'
+
   ci:
     name: Continuous Integration
     runs-on: ubuntu-latest
+    needs: detect-noop
+    if: needs.detect-noop.outputs.noop != 'true'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -25,12 +50,11 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version: ${{ env.GO_VERSION }}
           cache: true
 
       - name: Run Crossplane CI checks
         run: |
-          # Run individual CI checks instead of reviewable to avoid test issues
           make generate
           make lint
           make build
@@ -41,15 +65,21 @@ jobs:
     needs: ci
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     outputs:
-      version: ${{ steps.set_version.outputs.version }}
+      version: ${{ steps.version.outputs.VERSION }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          submodules: true
 
-      - name: Determine version and create tag
-        id: set_version
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Find the version
+        id: version
         run: |
           LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.3.6")
           COMMITS_SINCE_TAG=$(git log ${LAST_TAG}..HEAD --oneline || true)
@@ -72,115 +102,72 @@ jobs:
             git tag $NEW_TAG
             git push origin $NEW_TAG
             
-            echo "version=${NEW_TAG}" >> $GITHUB_OUTPUT
+            echo "VERSION=${NEW_TAG}" >> $GITHUB_OUTPUT
           else
             echo "No new commits, using existing version: $LAST_TAG"
-            echo "version=${LAST_TAG}" >> $GITHUB_OUTPUT
+            echo "VERSION=${LAST_TAG}" >> $GITHUB_OUTPUT
           fi
 
-  build_and_publish:
+  publish-artifacts:
     name: Build and Publish Multi-Arch
     runs-on: ubuntu-latest
-    needs: auto_tag
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [detect-noop, auto_tag]
+    if: needs.detect-noop.outputs.noop != 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
+      - name: Setup QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: all
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          version: ${{ env.DOCKER_BUILDX_VERSION }}
+          install: true
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           submodules: true
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-        id: buildx
+      - name: Set up Go
+        uses: actions/setup-go@v5
         with:
-          name: multiarch-builder
-          platforms: linux/amd64,linux/arm64
-          use: true
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
 
-      - name: Log in to GitHub Container Registry
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-
-      - name: Build and push multi-arch controller image
+      - name: Build Multi-Arch Docker Image
         run: |
           echo "Building multi-arch image with buildx..."
           
-          # Create and use the multiarch builder
-          docker buildx create --name multiarch --driver docker-container --use || true
-          docker buildx inspect --bootstrap
-          
-          # Build and push for multiple platforms
-          docker buildx build \
-            --platform linux/amd64,linux/arm64 \
-            --push \
-            --tag ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} \
-            --tag ghcr.io/${{ github.repository_owner }}/provider-nutanix:latest \
-            .
-
-      - name: Verify image availability
-        run: |
-          echo "Verifying multi-arch image build..."
-          sleep 15
-          
-          # Retry mechanism for image inspection
-          for i in {1..5}; do
-            echo "Attempt $i: Checking image availability..."
-            if docker buildx imagetools inspect ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}; then
-              echo "✅ Image is available!"
-              break
-            else
-              echo "⏳ Image not ready yet, waiting 10 seconds..."
-              sleep 10
-            fi
-          done
-
-      - name: Install Upbound CLI
-        run: |
-          curl -sL https://cli.upbound.io | sh
-          sudo mv up /usr/local/bin/
-
-      - name: Login to Upbound Registry (if configured)
+          # Build and push for multiple platforms using Makefile
+          make XPKG_REG_ORGS="${{ env.CROSSPLANE_REGORG }}" VERSION="${{ needs.auto_tag.outputs.version }}" docker.build docker.push
         env:
-          UPBOUND_ACCESS_ID: ${{ secrets.UPBOUND_ACCESS_ID }}
-          UPBOUND_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
-        run: |
-          if [ -n "$UPBOUND_ACCESS_ID" ] && [ -n "$UPBOUND_TOKEN" ]; then
-            up login --username="$UPBOUND_ACCESS_ID" --password="$UPBOUND_TOKEN"
-            echo "Successfully logged in to Upbound"
-          else
-            echo "Upbound credentials not found, will skip Upbound registry push"
-          fi
+          # Use buildx for multi-arch builds
+          BUILD_ARGS: "--platform linux/amd64,linux/arm64 --push"
 
-      - name: Build Crossplane package
+      - name: Build Crossplane Package
         run: |
-          up xpkg build \
-            --package-root=package \
-            --controller=ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} \
-            -o provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
+          # Build the .xpkg package
+          make XPKG_REG_ORGS="${{ env.CROSSPLANE_REGORG }}" VERSION="${{ needs.auto_tag.outputs.version }}" build.all
 
-      - name: Push to GitHub Container Registry
-        run: |
-          up xpkg push ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} \
-            -f provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
-          up xpkg push ghcr.io/${{ github.repository_owner }}/provider-nutanix:latest \
-            -f provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
+      - name: Upload Artifacts to GitHub
+        uses: actions/upload-artifact@v4
+        with:
+          name: output
+          path: _output/**
 
-      - name: Push to Upbound Registry
-        env:
-          UPBOUND_ACCESS_ID: ${{ secrets.UPBOUND_ACCESS_ID }}
-          UPBOUND_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
+      - name: Publish to GitHub Container Registry
         run: |
-          if [ -n "$UPBOUND_ACCESS_ID" ] && [ -n "$UPBOUND_TOKEN" ]; then
-            up xpkg push xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} \
-              -f provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
-            up xpkg push xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:latest \
-              -f provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
-          else
-            echo "Upbound credentials not found, skipping Upbound registry push"
-          fi
+          make XPKG_REG_ORGS="${{ env.CROSSPLANE_REGORG }}" VERSION="${{ needs.auto_tag.outputs.version }}" publish
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -211,7 +198,36 @@ jobs:
             ### Available Registries
             - **GitHub Container Registry**: `ghcr.io/${{ github.repository_owner }}/provider-nutanix`
             - **Upbound Marketplace**: `xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix`
-          files: provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
+          files: _output/xpkg/linux_amd64/provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  mirror-to-upbound:
+    name: Mirror to Upbound Registry
+    needs: [publish-artifacts, auto_tag]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Setup crane
+        uses: imjasonh/setup-crane@v0.4
+
+      - name: Login to Upbound Registry
+        uses: docker/login-action@v3
+        with:
+          registry: "xpkg.upbound.io"
+          username: ${{ secrets.UPBOUND_ACCESS_ID }}
+          password: ${{ secrets.UPBOUND_TOKEN }}
+        if: env.UPBOUND_ACCESS_ID != '' && env.UPBOUND_TOKEN != ''
+        env:
+          UPBOUND_ACCESS_ID: ${{ secrets.UPBOUND_ACCESS_ID }}
+          UPBOUND_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
+
+      - name: Mirror to Upbound Registry
+        run: |
+          crane copy ${{ env.CROSSPLANE_REGORG }}/${{ env.PROVIDER_REPO }}:${{ needs.auto_tag.outputs.version }} ${{ env.UPBOUND_REGORG }}/${{ env.PROVIDER_REPO }}:${{ needs.auto_tag.outputs.version }} --allow-nondistributable-artifacts
+          crane copy ${{ env.CROSSPLANE_REGORG }}/${{ env.PROVIDER_REPO }}:${{ needs.auto_tag.outputs.version }} ${{ env.UPBOUND_REGORG }}/${{ env.PROVIDER_REPO }}:latest --allow-nondistributable-artifacts
+        if: env.UPBOUND_ACCESS_ID != '' && env.UPBOUND_TOKEN != ''
+        env:
+          UPBOUND_ACCESS_ID: ${{ secrets.UPBOUND_ACCESS_ID }}
+          UPBOUND_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
 
