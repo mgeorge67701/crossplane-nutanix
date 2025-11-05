@@ -419,7 +419,7 @@ docker buildx build \
 
 # Build Crossplane package
 up xpkg build \
-  --package-root=crossplane-package \
+  --package-root=package \
   --controller=ghcr.io/mgeorge67701/provider-nutanix:${VERSION} \
   -o provider-nutanix-${VERSION}.xpkg
 
@@ -502,7 +502,7 @@ Get your credentials from [Upbound Console](https://console.upbound.io/) → Acc
 
 This error occurs when the Crossplane package (xpkg) is built incorrectly. The issue is usually:
 
-1. **Hardcoded controller image in crossplane.yaml**: The `spec.controller.image` field should NOT be present in `crossplane-package/crossplane.yaml`
+1. **Hardcoded controller image in crossplane.yaml**: The `spec.controller.image` field should NOT be present in `package/crossplane.yaml`
 2. **Incorrect xpkg build**: Use `up xpkg build --controller=<image>` to properly reference the controller image
 3. **Broken Docker image**: Ensure your Dockerfile has proper `ENTRYPOINT` and `CMD` instructions
 4. **Pipeline overwrites controller image**: In CI/CD, the xpkg build can overwrite the controller image if not done properly
@@ -518,12 +518,12 @@ make xpkg-push VERSION=${VERSION}      # Push package
 
 **Solution (Single Architecture)**:
 ```bash
-# 1. Remove spec.controller.image from crossplane-package/crossplane.yaml
+# 1. Remove spec.controller.image from package/crossplane.yaml
 # 2. Build Docker image first
 docker build -t ghcr.io/mgeorge67701/provider-nutanix:v1.0.0 .
 
 # 3. Build xpkg with --controller flag
-up xpkg build --package-root=crossplane-package --controller=ghcr.io/mgeorge67701/provider-nutanix:v1.0.0 -o provider.xpkg
+up xpkg build --package-root=package --controller=ghcr.io/mgeorge67701/provider-nutanix:v1.0.0 -o provider.xpkg
 
 # 4. Push both
 docker push ghcr.io/mgeorge67701/provider-nutanix:v1.0.0
@@ -540,7 +540,7 @@ kubectl describe providerrevision <revision-name>
 
 ### CRDs Not Installing
 
-Ensure your CRD files are in the correct location and referenced properly in `crossplane-package/crossplane.yaml`.
+Ensure your CRD files are in the correct location and referenced properly in `package/crossplane.yaml`.
 
 ## Contributing
 
