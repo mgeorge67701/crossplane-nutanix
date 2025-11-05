@@ -180,20 +180,19 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Install Upbound CLI for Package Build
+        run: |
+          curl -sL https://cli.upbound.io | sh
+          sudo mv up /usr/local/bin/
+
       - name: Build Crossplane Package
         run: |
-          echo "Building Crossplane package..."
-          # Update the image reference in crossplane package to use the pushed multi-arch image
-          sed -i "s|ghcr.io/${{ github.repository_owner }}/provider-nutanix:.*|ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}|g" package/crossplane.yaml || true
+          echo "Building Crossplane package with Upbound CLI..."
+          # Update the image reference in crossplane package to use our multi-arch image
+          sed -i "s|ghcr.io/${{ github.repository_owner }}/provider-nutanix:.*|ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}|g" package/crossplane.yaml
           
-          # Wait a moment for image to be available
-          sleep 5
-          
-          # Verify the multi-arch image is available
-          docker manifest inspect ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} || echo "Image not yet available"
-          
-          # Build the .xpkg package using the pushed multi-arch image
-          make XPKG_REG_ORGS="${{ env.CROSSPLANE_REGORG }}" VERSION="${{ needs.auto_tag.outputs.version }}" IMAGES="ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}" xpkg.build.provider-nutanix
+          # Build the .xpkg package directly with Upbound CLI to avoid Makefile issues
+          up xpkg build --package-root=package -o provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
 
       - name: Verify Multi-Arch Build
         run: |
@@ -227,7 +226,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: output
-          path: _output/**
+          path: provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
 
       - name: Publish to Registries
         run: |
@@ -248,6 +247,12 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "_Published at $(date)_" >> $GITHUB_STEP_SUMMARY
 
+      - name: Download .xpkg for Release
+        uses: actions/download-artifact@v4
+        with:
+          name: output
+          path: .
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -265,17 +270,22 @@ jobs:
             kubectl crossplane install provider ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}
             ```
             
+            **From Upbound Registry:**
+            ```bash
+            kubectl crossplane install provider xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}
+            ```
+            
             ### Supported Architectures
-            - `linux/amd64` - Intel/AMD processors
+            - `linux/amd64` - Intel/AMD processors  
             - `linux/arm64` - Apple Silicon, AWS Graviton, Raspberry Pi 5
             
             ### Available Registries
             - **GitHub Container Registry**: `ghcr.io/${{ github.repository_owner }}/provider-nutanix`
+            - **Upbound Registry**: `xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix`
             
-            ---
-            
-            *Note: If you have Upbound credentials configured, this package is also available on the Upbound Marketplace.*
-          files: _output/xpkg/linux_amd64/provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
+            ### Multi-Architecture Verified ✅
+            This release contains Docker images built for both AMD64 and ARM64 architectures, enabling deployment on various platforms including Raspberry Pi 5.
+          files: provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -311,7 +321,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: output
-          path: _output
+          path: .
 
       - name: Check Upbound Credentials
         id: check_credentials
@@ -325,7 +335,6 @@ jobs:
           fi
 
       - name: Install Upbound CLI
-        if: steps.check_credentials.outputs.credentials_available == 'true'
         run: |
           curl -sL https://cli.upbound.io | sh
           sudo mv up /usr/local/bin/
@@ -341,10 +350,11 @@ jobs:
 
       - name: Push .xpkg to GitHub Container Registry
         run: |
-          # Find the .xpkg file
-          XPKG_FILE=$(find _output -name "provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg" | head -1)
-          if [ -z "$XPKG_FILE" ]; then
-            echo "❌ Could not find .xpkg file"
+          # Use the downloaded .xpkg file
+          XPKG_FILE="provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg"
+          if [ ! -f "$XPKG_FILE" ]; then
+            echo "❌ Could not find .xpkg file: $XPKG_FILE"
+            ls -la
             exit 1
           fi
           
@@ -358,10 +368,10 @@ jobs:
       - name: Push to Upbound Registry
         if: steps.check_credentials.outputs.credentials_available == 'true'
         run: |
-          # Find the .xpkg file
-          XPKG_FILE=$(find _output -name "provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg" | head -1)
-          if [ -z "$XPKG_FILE" ]; then
-            echo "❌ Could not find .xpkg file"
+          # Use the downloaded .xpkg file
+          XPKG_FILE="provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg"
+          if [ ! -f "$XPKG_FILE" ]; then
+            echo "❌ Could not find .xpkg file: $XPKG_FILE"
             exit 1
           fi
           
