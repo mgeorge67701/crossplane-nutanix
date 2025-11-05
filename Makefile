@@ -43,6 +43,8 @@ KIND_VERSION = v0.20.0
 UP_VERSION = v0.28.0
 UP_CHANNEL = stable
 UPTEST_VERSION = v0.11.1
+CROSSPLANE_CLI_VERSION = v2.0.2
+CROSSPLANE_CLI_CHANNEL = stable
 -include build/makelib/k8s_tools.mk
 
 # ====================================================================================
@@ -61,3 +63,6 @@ XPKG_REG_ORGS ?= ghcr.io/mgeorge67701
 XPKG_REG_ORGS_NO_PROMOTE ?= xpkg.upbound.io/mgeorge67701
 XPKGS = $(PROJECT_NAME)
 -include build/makelib/xpkg.mk
+
+# NOTE(mgeorge67701): we ensure crossplane CLI is available before building packages
+xpkg.build.provider-nutanix: $(CROSSPLANE_CLI)
