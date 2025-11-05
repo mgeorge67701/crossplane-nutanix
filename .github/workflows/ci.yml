@@ -395,4 +395,3 @@ jobs:
           echo "- \`UPBOUND_TOKEN\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "_Status checked at $(date)_" >> $GITHUB_STEP_SUMMARY
-
