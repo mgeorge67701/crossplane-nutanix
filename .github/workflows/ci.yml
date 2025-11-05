@@ -88,6 +88,20 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+        id: buildx
+        with:
+          name: multiarch-builder
+          platforms: linux/amd64,linux/arm64
+          use: true
+
+      - name: Debug buildx setup
+        run: |
+          echo "Available builders:"
+          docker buildx ls
+          echo "Current builder details:"
+          docker buildx inspect
+          echo "Supported platforms:"
+          docker buildx inspect --bootstrap | grep Platforms
 
       - name: Log in to GitHub Container Registry
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
@@ -95,6 +109,7 @@ jobs:
       - name: Build and push multi-arch controller image
         uses: docker/build-push-action@v6
         with:
+          builder: ${{ steps.buildx.outputs.name }}
           context: .
           push: true
           platforms: linux/amd64,linux/arm64
@@ -103,7 +118,8 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/provider-nutanix:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          outputs: type=image,name=target,annotation-index.org.opencontainers.image.description=Multi-arch Crossplane Nutanix Provider
+          provenance: false
+          sbom: false
 
       - name: Verify multi-arch build and ensure availability
         run: |
