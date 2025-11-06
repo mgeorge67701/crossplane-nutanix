@@ -416,7 +416,7 @@ make status
 docker build -t ghcr.io/mgeorge67701/provider-nutanix:latest .
 
 # Build the Crossplane package (xpkg)
-up xpkg build --package-root=crossplane-package --controller=ghcr.io/mgeorge67701/provider-nutanix:latest -o provider-nutanix-latest.xpkg
+up xpkg build --package-root=package --controller=ghcr.io/mgeorge67701/provider-nutanix:latest -o provider-nutanix-latest.xpkg
 
 # Push both the container image and package
 docker push ghcr.io/mgeorge67701/provider-nutanix:latest
@@ -444,7 +444,7 @@ docker pull ghcr.io/mgeorge67701/provider-nutanix:v0.1.0-controller 2>&1
 
 # Step 2: Build Crossplane package using the controller image
 make xpkg-build VERSION=${VERSION}
-# This runs: up xpkg build --package-root=crossplane-package --controller=ghcr.io/mgeorge67701/provider-nutanix:v0.3.0-controller -o provider-nutanix-v0.3.0.xpkg
+# This runs: up xpkg build --package-root=package --controller=ghcr.io/mgeorge67701/provider-nutanix:v0.3.0-controller -o provider-nutanix-v0.3.0.xpkg
 
 # Step 3: Push to GHCR (GitHub Container Registry)
 make xpkg-push VERSION=${VERSION}
@@ -495,7 +495,7 @@ docker buildx build \
 
 # Step 3: Build Crossplane package using controller image
 up xpkg build \
-  --package-root=crossplane-package \
+  --package-root=package \
   --controller=ghcr.io/mgeorge67701/provider-nutanix:${VERSION}-controller \
   -o provider-nutanix-${VERSION}.xpkg
 
@@ -575,7 +575,7 @@ This project uses automated versioning and releases via GitHub Actions:
    docker buildx build --platform linux/amd64,linux/arm64 -t ghcr.io/mgeorge67701/provider-nutanix:v1.0.0-controller --push .
    
    # Build and push Crossplane package
-   up xpkg build --package-root=crossplane-package --controller=ghcr.io/mgeorge67701/provider-nutanix:v1.0.0-controller -o provider-nutanix-v1.0.0.xpkg
+   up xpkg build --package-root=package --controller=ghcr.io/mgeorge67701/provider-nutanix:v1.0.0-controller -o provider-nutanix-v1.0.0.xpkg
    up xpkg push ghcr.io/mgeorge67701/provider-nutanix:v1.0.0 -f provider-nutanix-v1.0.0.xpkg
    
    # Create GitHub Release (set GITHUB_TOKEN environment variable first)
@@ -616,7 +616,7 @@ To publish your provider to the Upbound Marketplace (like provider-kubernetes):
 up login
 
 # Build and push package
-up xpkg build --package-root=crossplane-package --controller=ghcr.io/mgeorge67701/provider-nutanix:v1.0.0 -o provider.xpkg
+up xpkg build --package-root=package --controller=ghcr.io/mgeorge67701/provider-nutanix:v1.0.0 -o provider.xpkg
 up xpkg push xpkg.upbound.io/mgeorge67701/provider-nutanix:v1.0.0 -f provider.xpkg
 ```
 
@@ -626,7 +626,7 @@ up xpkg push xpkg.upbound.io/mgeorge67701/provider-nutanix:v1.0.0 -f provider.xp
 
 This error occurs when the Crossplane package (xpkg) is built incorrectly. The issue is usually:
 
-1. **Hardcoded controller image in crossplane.yaml**: The `spec.controller.image` field should NOT be present in `crossplane-package/crossplane.yaml`
+1. **Hardcoded controller image in crossplane.yaml**: The `spec.controller.image` field should NOT be present in `package/crossplane.yaml`
 2. **Incorrect xpkg build**: Use `up xpkg build --controller=<image>` to properly reference the controller image
 3. **Broken Docker image**: Ensure your Dockerfile has proper `ENTRYPOINT` and `CMD` instructions
 4. **Pipeline overwrites controller image**: In CI/CD, the xpkg build can overwrite the controller image if not done properly
@@ -642,12 +642,12 @@ make xpkg-push VERSION=${VERSION}      # Push package
 
 **Solution (Single Architecture)**:
 ```bash
-# 1. Remove spec.controller.image from crossplane-package/crossplane.yaml
+# 1. Remove spec.controller.image from package/crossplane.yaml
 # 2. Build Docker image first
 docker build -t ghcr.io/mgeorge67701/provider-nutanix:v1.0.0 .
 
 # 3. Build xpkg with --controller flag
-up xpkg build --package-root=crossplane-package --controller=ghcr.io/mgeorge67701/provider-nutanix:v1.0.0 -o provider.xpkg
+up xpkg build --package-root=package --controller=ghcr.io/mgeorge67701/provider-nutanix:v1.0.0 -o provider.xpkg
 
 # 4. Push both
 docker push ghcr.io/mgeorge67701/provider-nutanix:v1.0.0
@@ -664,7 +664,7 @@ kubectl describe providerrevision <revision-name>
 
 ### CRDs Not Installing
 
-Ensure your CRD files are in the correct location and referenced properly in `crossplane-package/crossplane.yaml`.
+Ensure your CRD files are in the correct location and referenced properly in `package/crossplane.yaml`.
 
 ## Contributing
 

@@ -64,7 +64,7 @@ docker-buildx: ## Build and push multi-platform controller image
 
 .PHONY: xpkg-build
 xpkg-build: ## Build the Crossplane package
-	up xpkg build --package-root=crossplane-package --controller=$(CONTROLLER_IMG) -o $(XPKG_FILE)
+	up xpkg build --package-root=package --controller=$(CONTROLLER_IMG) -o $(XPKG_FILE)
 
 .PHONY: xpkg-push
 xpkg-push: ## Push the Crossplane package

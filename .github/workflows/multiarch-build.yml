@@ -103,7 +103,7 @@ jobs:
           
           # Build the package
           up xpkg build \
-            --package-root=crossplane-package \
+            --package-root=package \
             --controller=${CONTROLLER_IMAGE} \
             -o provider-nutanix-${VERSION}-${{ matrix.arch }}.xpkg
 

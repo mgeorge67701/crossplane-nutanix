@@ -44,17 +44,17 @@ jobs:
 
       - name: Build Crossplane package
         run: |
-          up xpkg build --package-root=crossplane-package --controller=ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ github.ref_name }}-controller
+          up xpkg build --package-root=package --controller=ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ github.ref_name }}-controller
           
       - name: Push Crossplane package
         run: |
-          up xpkg push ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ github.ref_name }} -f crossplane-package/*.xpkg
+          up xpkg push ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ github.ref_name }} -f package/*.xpkg
 
       - name: Upload release assets
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            crossplane-package/*.xpkg
-            crossplane-package/*.yaml
+            package/*.xpkg
+            package/*.yaml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
