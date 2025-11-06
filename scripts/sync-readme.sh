@@ -1,15 +1,15 @@
 #!/bin/bash
-# Robustly sync README.md into package.yaml meta.crossplane.io/readme annotation
+# Robustly sync README.md into crossplane.yaml meta.crossplane.io/readme annotation
 
 README_PATH="README.md"
-CROSSPLANE_YAML="package/package.yaml"
+CROSSPLANE_YAML="package/crossplane.yaml"
 
 if [ ! -f "$README_PATH" ]; then
   echo "README.md not found!"
   exit 1
 fi
 if [ ! -f "$CROSSPLANE_YAML" ]; then
-  echo "package/package.yaml not found!"
+  echo "package/crossplane.yaml not found!"
   exit 1
 fi
 
@@ -45,4 +45,4 @@ else
   ' "$CROSSPLANE_YAML" > "$CROSSPLANE_YAML.tmp" && mv "$CROSSPLANE_YAML.tmp" "$CROSSPLANE_YAML"
 fi
 
-echo "README.md content fully synced to package.yaml annotation."
+echo "README.md content fully synced to crossplane.yaml annotation."
