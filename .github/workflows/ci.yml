@@ -128,8 +128,6 @@ jobs:
       - name: Pull multi-arch image for xpkg build
         run: |
           docker pull ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}
-      - name: Replace version placeholder
-        run: sed -i -e "s|ghcr.io/${{ github.repository_owner }}/provider-nutanix:.*|ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}|g" package/package.yaml
       - name: Debug - Verify package files
         run: |
           echo "Files in package directory:"
