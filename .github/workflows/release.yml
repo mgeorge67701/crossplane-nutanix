@@ -5,90 +5,56 @@ on:
     tags:
       - 'v*'
 
-permissions:
-  contents: write
-  packages: write
-
 jobs:
-  release:
-    name: Release Multi-Arch Provider
+  build-and-release:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Build and push multi-arch controller image
+        uses: docker/build-push-action@v5
         with:
-          fetch-depth: 0
-          submodules: true
+          context: .
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ github.ref_name }}-controller
 
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version: '1.21'
-          cache: true
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install Upbound CLI
         run: |
           curl -sL https://cli.upbound.io | sh
-          sudo mv up /usr/local/bin/
+          echo "$HOME/.up/bin" >> $GITHUB_PATH
+          
+      - name: Login to GitHub Container Registry for Upbound
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | up registry login ghcr.io -u ${{ github.actor }} --password-stdin
 
-      - name: Login to Upbound Registry (if configured)
-        env:
-          UPBOUND_ACCESS_ID: ${{ secrets.UPBOUND_ACCESS_ID }}
-          UPBOUND_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
+      - name: Build Crossplane package
         run: |
-          if [ -n "$UPBOUND_ACCESS_ID" ] && [ -n "$UPBOUND_TOKEN" ]; then
-            up login --username="$UPBOUND_ACCESS_ID" --password="$UPBOUND_TOKEN"
-            echo "Successfully logged in to Upbound"
-          else
-            echo "Upbound credentials not configured, will skip Upbound registry push"
-          fi
-
-      - name: Build and Publish Multi-Arch Release
-        env:
-          VERSION: ${{ github.ref_name }}
+          up xpkg build --package-root=crossplane-package --controller=ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ github.ref_name }}-controller
+          
+      - name: Push Crossplane package
         run: |
-          echo "Building and publishing multi-architecture release: $VERSION"
-          make publish VERSION=$VERSION
+          up xpkg push ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ github.ref_name }} -f crossplane-package/*.xpkg
 
-      - name: Create GitHub Release
+      - name: Upload release assets
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
-          name: Release ${{ github.ref_name }}
-          body: |
-            ## Multi-Architecture Crossplane Nutanix Provider ${{ github.ref_name }}
-            
-            This release provides multi-architecture support for AMD64 and ARM64 platforms.
-            
-            ### Installation
-            
-            **From GitHub Container Registry:**
-            ```bash
-            kubectl crossplane install provider ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ github.ref_name }}
-            ```
-            
-            **From Upbound Marketplace:**
-            ```bash
-            kubectl crossplane install provider xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:${{ github.ref_name }}
-            ```
-            
-            ### Supported Architectures
-            - `linux/amd64` - Intel/AMD processors
-            - `linux/arm64` - Apple Silicon, AWS Graviton, Raspberry Pi 5
-            
-            ### Available Registries
-            - **GitHub Container Registry**: `ghcr.io/${{ github.repository_owner }}/provider-nutanix`
-            - **Upbound Marketplace**: `xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix`
-          files: _output/xpkg/**/*.xpkg
+          files: |
+            crossplane-package/*.xpkg
+            crossplane-package/*.yaml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

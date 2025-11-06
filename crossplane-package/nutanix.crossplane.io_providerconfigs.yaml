@@ -1,0 +1,191 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.19.0
+  name: providerconfigs.nutanix.crossplane.io
+spec:
+  group: nutanix.crossplane.io
+  names:
+    categories:
+      - crossplane
+      - provider
+      - nutanix
+    kind: ProviderConfig
+    listKind: ProviderConfigList
+    plural: providerconfigs
+    singular: providerconfig
+  scope: Cluster
+  versions:
+    - additionalPrinterColumns:
+        - jsonPath: .metadata.creationTimestamp
+          name: AGE
+          type: date
+        - jsonPath: .spec.credentials.secretRef.name
+          name: SECRET-NAME
+          type: string
+      name: v1beta1
+      schema:
+        openAPIV3Schema:
+          description: ProviderConfig is used to configure a Nutanix provider.
+          properties:
+            apiVersion:
+              description: 'APIVersion defines the versioned schema of this representation of an object.'
+              type: string
+            kind:
+              description: 'Kind is a string value representing the REST resource this object represents.'
+              type: string
+            metadata:
+              type: object
+            spec:
+              description: ProviderConfigSpec defines the desired state of a ProviderConfig.
+              properties:
+                credentials:
+                  description: Credentials required to authenticate to this provider.
+                  properties:
+                    env:
+                      description: |-
+                        Env is a reference to an environment variable that contains credentials
+                        that must be used to connect to the provider.
+                      properties:
+                        name:
+                          description: Name is the name of an environment variable.
+                          type: string
+                      required:
+                      - name
+                      type: object
+                    fs:
+                      description: |-
+                        Fs is a reference to a filesystem location that contains credentials that
+                        must be used to connect to the provider.
+                      properties:
+                        path:
+                          description: Path is a filesystem path.
+                          type: string
+                      required:
+                      - path
+                      type: object
+                    secretRef:
+                      description: |-
+                        A SecretRef is a reference to a secret key that contains the credentials
+                        that must be used to connect to the provider.
+                      properties:
+                        key:
+                          description: The key to select.
+                          type: string
+                        name:
+                          description: Name of the secret.
+                          type: string
+                        namespace:
+                          description: Namespace of the secret.
+                          type: string
+                      required:
+                      - key
+                      - name
+                      - namespace
+                      type: object
+                    source:
+                      description: Source of the provider credentials.
+                      enum:
+                      - None
+                      - Secret
+                      - InjectedIdentity
+                      - Environment
+                      - Filesystem
+                      type: string
+                  required:
+                    - source
+                  type: object
+                allowedLobs:
+                  description: Allowed Line of Business values for VMs.
+                  items:
+                    type: string
+                  type: array
+                isLobMandatory:
+                  description: Specifies whether the LoB field is mandatory for VMs.
+                  type: boolean
+                prismCentralEndpoints:
+                  description: Maps datacenter names to their Prism Central endpoints.
+                  additionalProperties:
+                    type: string
+                  type: object
+                enableAvailabilityZoneMapping:
+                  description: Controls whether the provider should use the availability zone mapping feature.
+                  type: boolean
+                availabilityZoneMappingURL:
+                  description: URL to fetch the availability zone to cluster mapping CSV.
+                  type: string
+                datacenterCredentials:
+                  additionalProperties:
+                    description: ProviderCredentials required to authenticate.
+                    properties:
+                      env:
+                        description: |-
+                          Env is a reference to an environment variable that contains credentials
+                          that must be used to connect to the provider.
+                        properties:
+                          name:
+                            description: Name is the name of an environment variable.
+                            type: string
+                        required:
+                        - name
+                        type: object
+                      fs:
+                        description: |-
+                          Fs is a reference to a filesystem location that contains credentials that
+                          must be used to connect to the provider.
+                        properties:
+                          path:
+                            description: Path is a filesystem path.
+                            type: string
+                        required:
+                        - path
+                        type: object
+                      secretRef:
+                        description: |-
+                          A SecretRef is a reference to a secret key that contains the credentials
+                          that must be used to connect to the provider.
+                        properties:
+                          key:
+                            description: The key to select.
+                            type: string
+                          name:
+                            description: Name of the secret.
+                            type: string
+                          namespace:
+                            description: Namespace of the secret.
+                            type: string
+                        required:
+                        - key
+                        - name
+                        - namespace
+                        type: object
+                      source:
+                        description: Source of the provider credentials.
+                        enum:
+                        - None
+                        - Secret
+                        - InjectedIdentity
+                        - Environment
+                        - Filesystem
+                        type: string
+                    required:
+                    - source
+                    type: object
+                  description: |-
+                    DatacenterCredentials maps datacenter names to their specific credentials.
+                    This allows using different credentials for different Prism Central instances.
+                  type: object
+              required:
+                - credentials
+              type: object
+            status:
+              description: ProviderConfigStatus defines the observed state of ProviderConfig.
+              type: object
+          required:
+            - spec
+          type: object
+      served: true
+      storage: true
+      subresources:
+        status: {}
