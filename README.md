@@ -425,7 +425,9 @@ up xpkg push ghcr.io/mgeorge67701/provider-nutanix:latest -f provider-nutanix-la
 
 **Multi-Architecture Build (Production - Latest: v0.3.0)**
 
-> **✅ CONFIRMED WORKING**: Both GHCR and Upbound registries work with this approach
+**✅ CONFIRMED WORKING**: Both GHCR and Upbound registries work with this approach
+
+**Note**: Upbound doesn't support multi-architecture builds. Build the image for **amd64** or **arm64** on Linux or Mac, or use **GHCR**.
 
 ```bash
 echo $GITHUB_TOKEN | docker login ghcr.io -u mgeorge67701 --password-stdin
@@ -436,6 +438,9 @@ export VERSION=v0.3.0
 # Step 1: Build and push multi-architecture controller image (with -controller suffix)
 make docker-buildx VERSION=${VERSION}
 # This runs: docker buildx build --platform linux/amd64,linux/arm64 -t ghcr.io/mgeorge67701/provider-nutanix:v0.3.0-controller --push .
+
+# Pull the image
+docker pull ghcr.io/mgeorge67701/provider-nutanix:v0.1.0-controller 2>&1
 
 # Step 2: Build Crossplane package using the controller image
 make xpkg-build VERSION=${VERSION}
