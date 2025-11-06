@@ -45,6 +45,7 @@ Thumbs.db
 
 # Build artifacts
 dist/
+build/
 bin/
 *~
 
@@ -62,7 +63,7 @@ Thumbs.db
 *.bak
 *.log
 
-# Build artifacts (but keep build/ submodule)
+# Build artifacts
 bin/
 dist/
 provider-nutanix

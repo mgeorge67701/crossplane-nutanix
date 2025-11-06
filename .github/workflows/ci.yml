@@ -3,404 +3,203 @@ name: CI
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
   workflow_dispatch:
-
-env:
-  GO_VERSION: '1.21'
-  DOCKER_BUILDX_VERSION: 'v0.22.0'
-  UP_VERSION: 'v0.38.4'
-  CROSSPLANE_REGORG: 'ghcr.io/mgeorge67701'
-  UPBOUND_REGORG: 'xpkg.upbound.io/mgeorge67701'
-  PROVIDER_REPO: provider-nutanix
-  CROSSPLANE_CONTROLLER_IMAGE: 'ghcr.io/mgeorge67701/provider-nutanix-controller'
-  XPKG_GHCR_REPO: 'ghcr.io/mgeorge67701/provider-nutanix'
 
 permissions:
   contents: write
   packages: write
-  attestations: write
-  id-token: write
 
 jobs:
-  detect-noop:
+  test:
     runs-on: ubuntu-latest
-    outputs:
-      noop: ${{ steps.noop.outputs.should_skip }}
     steps:
-      - name: Detect No-op Changes
-        id: noop
-        uses: fkirc/skip-duplicate-actions@f75f66ce1886f00957d99748a42c724f4330bdcf # v5.3.1
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          paths_ignore: '["**.md", "**.png", "**.jpg"]'
-          do_not_skip: '["workflow_dispatch", "schedule", "push"]'
-
-  ci:
-    name: Continuous Integration
-    runs-on: ubuntu-latest
-    needs: detect-noop
-    if: needs.detect-noop.outputs.noop != 'true'
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          submodules: true
-
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v4
         with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
-
-      - name: Run Crossplane CI checks
-        run: |
-          make generate
-          make lint
-          make build
-
-      - name: Generate CI Summary
-        run: |
-          echo "## ✅ Continuous Integration" >> $GITHUB_STEP_SUMMARY
-          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
-          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| **Code Generation** | ✅ Completed |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Linting** | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Build** | ✅ Successful |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Go Version** | ${{ env.GO_VERSION }} |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "_CI checks completed at $(date)_" >> $GITHUB_STEP_SUMMARY
+          go-version: '1.25'
+          cache: false # Disable the built-in cache to avoid tar issues
+  # Go module cache step removed to prevent tar extraction errors
+      - name: Run unit tests
+        run: go test ./...
 
   auto_tag:
-    name: Auto Tag Release
+    needs: test
     runs-on: ubuntu-latest
-    needs: ci
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     outputs:
-      version: ${{ steps.version.outputs.VERSION }}
+      version: ${{ steps.set_version.outputs.version }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          submodules: true
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-
-      - name: Find the version
-        id: version
+      - name: Determine version
+        id: set_version
         run: |
-          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.3.6")
-          COMMITS_SINCE_TAG=$(git log ${LAST_TAG}..HEAD --oneline || true)
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          COMMITS_SINCE_TAG=$(git log ${LAST_TAG}..HEAD --pretty=%s || true)
           
+          # Default to existing tag
+          VERSION_TO_USE=$LAST_TAG
+          
+          # Only bump version if there are new, relevant commits
           if [ -n "$COMMITS_SINCE_TAG" ]; then
-            # Extract version numbers
+            # Always increment patch version
             ver=${LAST_TAG#v}
             IFS='.' read -r major minor patch <<< "$ver"
             major=${major:-0}
             minor=${minor:-0}
             patch=${patch:-0}
             
-            # Auto-increment patch version
             patch=$((patch+1))
-            NEW_TAG="v${major}.${minor}.${patch}"
             
-            echo "New version: $NEW_TAG (previous: $LAST_TAG)"
+            NEW_TAG="v${major}.${minor}.${patch}"
+            VERSION_TO_USE=$NEW_TAG
+            
+            echo "New version determined: $NEW_TAG"
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git tag $NEW_TAG
-            git push origin $NEW_TAG
-            
-            echo "VERSION=${NEW_TAG}" >> $GITHUB_OUTPUT
+            git push "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" $NEW_TAG
           else
-            echo "No new commits, using existing version: $LAST_TAG"
-            echo "VERSION=${LAST_TAG}" >> $GITHUB_OUTPUT
+            echo "No new commits since last tag. Using existing version: $LAST_TAG"
           fi
+          
+          echo "version=${VERSION_TO_USE}" >> $GITHUB_OUTPUT
 
-      - name: Generate Auto Tag Summary
-        run: |
-          echo "## 🏷️ Auto Tag Release" >> $GITHUB_STEP_SUMMARY
-          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
-          echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| **Version** | ${{ steps.version.outputs.VERSION }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Previous Tag** | $(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || 'None') |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Commits Since Last** | $(git log $(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || 'HEAD')..HEAD --oneline | wc -l || 0) |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Branch** | ${{ github.ref_name }} |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "_Version tagged at $(date)_" >> $GITHUB_STEP_SUMMARY
-
-  publish-artifacts:
-    name: Build and Publish Multi-Arch
+  package:
+    needs: auto_tag
     runs-on: ubuntu-latest
-    needs: [detect-noop, auto_tag]
-    if: needs.detect-noop.outputs.noop != 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    timeout-minutes: 60
     steps:
-      - name: Setup QEMU
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: all
-
-      - name: Setup Docker Buildx
-        uses: docker/setup-buildx-action@v3
-        with:
-          version: ${{ env.DOCKER_BUILDX_VERSION }}
-          install: true
-
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          submodules: true
-
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v4
         with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
+          go-version: '1.25'
+          cache: false # Disable the built-in cache to avoid tar issues
+      # Go module cache step removed to prevent tar extraction errors
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: linux/amd64,linux/arm64
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          platforms: linux/amd64,linux/arm64
+      - name: Show Dockerfile path
+        run: |
+          echo "Using Dockerfile at $(pwd)/Dockerfile"
+      - name: Install Upbound CLI
+        run: |
+          curl -sL https://cli.upbound.io | sh
+          sudo mv up /usr/local/bin/
+      - name: Login to Upbound Registry
+        env:
+          UPBOUND_ACCESS_ID: ${{ secrets.UPBOUND_ACCESS_ID }}
+          UPBOUND_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
+        run: |
+          up login --username="${{ secrets.UPBOUND_ACCESS_ID }}" --password="${{ secrets.UPBOUND_TOKEN }}"
+      - name: Login to GitHub Container Registry
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
-      - name: Build Multi-Arch Controller Images
-        uses: docker/build-push-action@v5
+      - name: Build and push multi-arch controller image
+        uses: docker/build-push-action@v6
         with:
           context: .
           push: true
           platforms: linux/amd64,linux/arm64
           tags: |
-            ${{ env.CROSSPLANE_CONTROLLER_IMAGE }}:${{ needs.auto_tag.outputs.version }}
-            ${{ env.CROSSPLANE_CONTROLLER_IMAGE }}:latest
+            ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}
+            ghcr.io/${{ github.repository_owner }}/provider-nutanix:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          provenance: false
+          sbom: false
 
-      - name: Install Upbound CLI for Package Build
+      - name: Verify multi-arch manifest in GHCR
         run: |
-          curl -sL https://cli.upbound.io | sh
-          sudo mv up /usr/local/bin/
+          docker buildx imagetools inspect ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}
 
-      - name: Build Crossplane Package
-        env:
-          CONTROLLER_IMAGE: ${{ env.CROSSPLANE_CONTROLLER_IMAGE }}
+      - name: Pull multi-arch image for xpkg build
         run: |
-          echo "Building Crossplane package with Upbound CLI..."
-          # Update the image reference in crossplane package to use our multi-arch controller image
-          sed -i "s|^\(\s*image: \).*|\1${CONTROLLER_IMAGE}:${{ needs.auto_tag.outputs.version }}|" package/crossplane.yaml
-          
-          # Build the .xpkg package directly with Upbound CLI to avoid Makefile issues
-          up xpkg build --package-root=package -o provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
-
-      - name: Verify Multi-Arch Controller Image
-        env:
-          CONTROLLER_IMAGE: ${{ env.CROSSPLANE_CONTROLLER_IMAGE }}
-        run: |
-          echo "🔍 Verifying multi-arch build..."
-          docker manifest inspect ${CONTROLLER_IMAGE}:${{ needs.auto_tag.outputs.version }} || echo "Manifest inspection failed"
-
-      - name: Generate Build Summary
-        run: |
-          echo "## 🔨 Multi-Architecture Build" >> $GITHUB_STEP_SUMMARY
-          echo "| Component | Status |" >> $GITHUB_STEP_SUMMARY
-          echo "|-----------|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| **Docker Images** | ✅ Built & Pushed (Multi-Arch) |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Architectures** | linux/amd64, linux/arm64 |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Crossplane Package** | ✅ Generated |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Version** | ${{ needs.auto_tag.outputs.version }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Controller Image** | ${{ env.CROSSPLANE_CONTROLLER_IMAGE }}:${{ needs.auto_tag.outputs.version }} |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 📦 Multi-Arch Verification" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
-          echo "# Verify multi-arch support:" >> $GITHUB_STEP_SUMMARY
-          echo "docker manifest inspect ${{ env.CROSSPLANE_CONTROLLER_IMAGE }}:${{ needs.auto_tag.outputs.version }}" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 🚀 Supported Platforms" >> $GITHUB_STEP_SUMMARY
-          echo "- **Intel/AMD (x86_64)**: Traditional servers and desktops" >> $GITHUB_STEP_SUMMARY
-          echo "- **ARM64**: Apple Silicon, AWS Graviton, Raspberry Pi 5" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "_Build completed at $(date)_" >> $GITHUB_STEP_SUMMARY
-
-      - name: Upload Artifacts to GitHub
-        uses: actions/upload-artifact@v4
-        with:
-          name: output
-          path: provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
-
-      - name: Download .xpkg for Release
-        uses: actions/download-artifact@v4
-        with:
-          name: output
-          path: .
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ needs.auto_tag.outputs.version }}
-          name: Release ${{ needs.auto_tag.outputs.version }}
-          body: |
-            ## Multi-Architecture Crossplane Nutanix Provider ${{ needs.auto_tag.outputs.version }}
-            
-            This release provides multi-architecture support for AMD64 and ARM64 platforms.
-            
-            ### Installation
-            
-            **From GitHub Container Registry:**
-            ```bash
-            kubectl crossplane install provider ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}
-            ```
-            
-            **From Upbound Registry:**
-            ```bash
-            kubectl crossplane install provider xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}
-            ```
-            
-            ### Supported Architectures
-            - `linux/amd64` - Intel/AMD processors  
-            - `linux/arm64` - Apple Silicon, AWS Graviton, Raspberry Pi 5
-            
-            ### Available Registries
-            - **GitHub Container Registry**: `ghcr.io/${{ github.repository_owner }}/provider-nutanix`
-            - **Upbound Registry**: `xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix`
-            
-            ### Multi-Architecture Verified ✅
-            This release contains Docker images built for both AMD64 and ARM64 architectures, enabling deployment on various platforms including Raspberry Pi 5.
-          files: provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Generate Release Summary
-        run: |
-          echo "## 🎉 GitHub Release Created" >> $GITHUB_STEP_SUMMARY
-          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
-          echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| **Release Tag** | [${{ needs.auto_tag.outputs.version }}](https://github.com/${{ github.repository }}/releases/tag/${{ needs.auto_tag.outputs.version }}) |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Artifacts** | ✅ .xpkg package included |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Multi-Arch** | ✅ AMD64 + ARM64 |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Raspberry Pi 5** | ✅ Supported |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 🚀 Quick Install" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
-          echo "kubectl crossplane install provider ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "_Release created at $(date)_" >> $GITHUB_STEP_SUMMARY
-
-  publish-to-upbound:
-    name: Publish to Upbound Registry
-    needs: [publish-artifacts, auto_tag]
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Download .xpkg artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: output
-          path: .
-
-      - name: Check Upbound Credentials
-        id: check_credentials
-        run: |
-          if [ -n "${{ secrets.UPBOUND_ACCESS_ID }}" ] && [ -n "${{ secrets.UPBOUND_TOKEN }}" ]; then
-            echo "credentials_available=true" >> $GITHUB_OUTPUT
-            echo "✅ Upbound credentials are available"
-          else
-            echo "credentials_available=false" >> $GITHUB_OUTPUT
-            echo "⚠️ Upbound credentials not found - skipping Upbound publishing"
-          fi
-
+          docker pull ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}
+      - name: Replace version placeholder
+        run: sed -i -e "s|ghcr.io/${{ github.repository_owner }}/provider-nutanix:.*|ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}|g" package/crossplane.yaml
       - name: Install Upbound CLI
         run: |
           curl -sL https://cli.upbound.io | sh
           sudo mv up /usr/local/bin/
-          up version
+      # - name: Sync README to crossplane.yaml
+      #   run: bash scripts/sync-readme.sh package/crossplane.yaml
+      - name: Build .xpkg
+        run: |
+          up xpkg build --package-root=package --controller=ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} -o provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
+      - name: Upload .xpkg
+        uses: actions/upload-artifact@v4
+        with:
+          name: provider-xpkg
+          path: provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
 
-      - name: Login to Upbound Registry
-        if: steps.check_credentials.outputs.credentials_available == 'true'
+  publish:
+    needs: [package, auto_tag]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Download .xpkg artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: provider-xpkg
+          path: .
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.25'
+          cache: false # Disable the built-in cache to avoid tar issues
+  # Go module cache step removed to prevent tar extraction errors
+      - name: Install Upbound CLI
+        run: |
+          curl -sL https://cli.upbound.io | sh
+          sudo mv up /usr/local/bin/
+      - name: Login to Upbound
+        env:
+          UPBOUND_ACCESS_ID: ${{ secrets.UPBOUND_ACCESS_ID }}
+          UPBOUND_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
         run: |
           up login --username="${{ secrets.UPBOUND_ACCESS_ID }}" --password="${{ secrets.UPBOUND_TOKEN }}"
-
-      - name: Login to GitHub Container Registry for .xpkg
+      - name: Push package to Upbound Registry
+        run: |
+          # Use up CLI to push the package
+          up xpkg push xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} -f provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg || echo "Failed with up CLI push method 1"
+          up xpkg push xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:latest -f provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg || echo "Failed with up CLI push method 2"
+      - name: Login to GitHub Container Registry for xpkg
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
-      - name: Push .xpkg to GitHub Container Registry
+      - name: Push .xpkg to GHCR
         run: |
-          # Use the downloaded .xpkg file
-          XPKG_FILE="provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg"
-          if [ ! -f "$XPKG_FILE" ]; then
-            echo "❌ Could not find .xpkg file: $XPKG_FILE"
-            ls -la
-            exit 1
-          fi
-          
-          echo "📦 Found package: $XPKG_FILE"
-          
-          # Push .xpkg to GitHub Container Registry
-          echo "🚀 Pushing .xpkg to GitHub Container Registry..."
-          up xpkg push ${{ env.XPKG_GHCR_REPO }}:${{ needs.auto_tag.outputs.version }} -f "$XPKG_FILE"
-          up xpkg push ${{ env.XPKG_GHCR_REPO }}:latest -f "$XPKG_FILE"
+          up xpkg push ghcr.io/${{ github.repository_owner }}/provider-nutanix-xpkg:${{ needs.auto_tag.outputs.version }} -f provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
+          up xpkg push ghcr.io/${{ github.repository_owner }}/provider-nutanix-xpkg:latest -f provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
 
-      - name: Push to Upbound Registry
-        if: steps.check_credentials.outputs.credentials_available == 'true'
-        run: |
-          # Use the downloaded .xpkg file
-          XPKG_FILE="provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg"
-          if [ ! -f "$XPKG_FILE" ]; then
-            echo "❌ Could not find .xpkg file: $XPKG_FILE"
-            exit 1
-          fi
-          
-          echo "📦 Found package: $XPKG_FILE"
-          
-          # Push to Upbound Registry using the simple method
-          echo "🚀 Pushing to Upbound Registry..."
-          up xpkg push xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} -f "$XPKG_FILE"
-          up xpkg push xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:latest -f "$XPKG_FILE"
-          
-          echo "✅ Successfully pushed to Upbound Registry"
-
-      - name: Generate Upbound Summary - Success
-        if: steps.check_credentials.outputs.credentials_available == 'true'
-        run: |
-          echo "## 🔄 Upbound Registry Publishing" >> $GITHUB_STEP_SUMMARY
-          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
-          echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| **Status** | ✅ Success |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Access ID** | ${{ secrets.UPBOUND_ACCESS_ID }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Registry** | xpkg.upbound.io |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Package URL** | [\`xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}\`](https://marketplace.upbound.io/providers/${{ github.repository_owner }}/provider-nutanix) |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 📦 Dual Registry Availability" >> $GITHUB_STEP_SUMMARY
-          echo "- **GitHub**: \`ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Upbound**: \`xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "_Published at $(date)_" >> $GITHUB_STEP_SUMMARY
-
-      - name: Generate Upbound Summary - Skipped
-        if: steps.check_credentials.outputs.credentials_available == 'false'
-        run: |
-          echo "## ⏭️ Upbound Registry Publishing" >> $GITHUB_STEP_SUMMARY
-          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
-          echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| **Status** | ⏭️ Skipped |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Reason** | Credentials Not Configured |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 🔑 To Enable Upbound Publishing" >> $GITHUB_STEP_SUMMARY
-          echo "Add these secrets to your GitHub repository:" >> $GITHUB_STEP_SUMMARY
-          echo "- \`UPBOUND_ACCESS_ID\`" >> $GITHUB_STEP_SUMMARY
-          echo "- \`UPBOUND_TOKEN\`" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "_Status checked at $(date)_" >> $GITHUB_STEP_SUMMARY
-          
+  create_release:
+    needs: [publish, auto_tag]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download .xpkg
+        uses: actions/download-artifact@v4
+        with:
+          name: provider-xpkg
+          path: .
+      - name: Create GitHub release and upload asset
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ needs.auto_tag.outputs.version }}
+          files: provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

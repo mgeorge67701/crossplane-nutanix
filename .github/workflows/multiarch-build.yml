@@ -1,0 +1,241 @@
+name: Multi-Architecture Build and Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g., v0.3.45)'
+        required: true
+        type: string
+  push:
+    tags:
+      - 'v*'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/provider-nutanix
+
+jobs:
+  # Build multi-arch controller image
+  build-controller:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=tag,suffix=-controller
+            type=raw,value=${{ inputs.version }}-controller,enable=${{ github.event_name == 'workflow_dispatch' }}
+
+      - name: Build and push controller
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  # Build packages for each architecture
+  build-packages:
+    needs: build-controller
+    strategy:
+      matrix:
+        arch: [amd64, arm64]
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-latest-arm64
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/}"
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Install Up CLI
+        run: |
+          curl -sL "https://cli.upbound.io" | sh
+          sudo mv up /usr/local/bin/
+
+      - name: Login to Upbound
+        run: up login --token="${{ secrets.UPBOUND_TOKEN }}"
+
+      - name: Login to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Build package for ${{ matrix.arch }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          CONTROLLER_IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION}-controller"
+          
+          # Build the package
+          up xpkg build \
+            --package-root=package \
+            --controller=${CONTROLLER_IMAGE} \
+            -o provider-nutanix-${VERSION}-${{ matrix.arch }}.xpkg
+
+      - name: Push to GHCR
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          up xpkg push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION}-${{ matrix.arch }} \
+            -f provider-nutanix-${VERSION}-${{ matrix.arch }}.xpkg
+
+      - name: Push to Upbound
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          up xpkg push xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:${VERSION}-${{ matrix.arch }} \
+            -f provider-nutanix-${VERSION}-${{ matrix.arch }}.xpkg
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-${{ matrix.arch }}
+          path: provider-nutanix-${{ steps.version.outputs.version }}-${{ matrix.arch }}.xpkg
+
+  # Create default packages and GitHub release
+  create-release:
+    needs: [build-controller, build-packages]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/}"
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Download package artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: packages
+
+      - name: Install Up CLI
+        run: |
+          curl -sL "https://cli.upbound.io" | sh
+          sudo mv up /usr/local/bin/
+
+      - name: Login to Upbound
+        run: up login --token="${{ secrets.UPBOUND_TOKEN }}"
+
+      - name: Login to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Create default packages
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          
+          # Use ARM64 as default (could be changed to AMD64 if preferred)
+          cp packages/package-arm64/provider-nutanix-${VERSION}-arm64.xpkg provider-nutanix-${VERSION}.xpkg
+          
+          # Push default packages
+          up xpkg push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION} -f provider-nutanix-${VERSION}.xpkg
+          up xpkg push xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:${VERSION} -f provider-nutanix-${VERSION}.xpkg
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.version.outputs.version }}
+          name: Release ${{ steps.version.outputs.version }}
+          body: |
+            # Crossplane Nutanix Provider ${{ steps.version.outputs.version }}
+            
+            ## 🚀 True Multi-Architecture Release
+            
+            This release provides **native packages for both AMD64 and ARM64** architectures, built on their respective platforms for optimal compatibility.
+            
+            ### 📦 Available Images
+            
+            #### 🎯 Multi-Architecture Controller Image
+            ```bash
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}-controller
+            ```
+            **Platforms:** `linux/amd64`, `linux/arm64`
+            
+            #### 📱 Native Architecture Packages
+            ```bash
+            # AMD64 packages (built on AMD64)
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}-amd64
+            xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:${{ steps.version.outputs.version }}-amd64
+            
+            # ARM64 packages (built on ARM64)  
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}-arm64
+            xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:${{ steps.version.outputs.version }}-arm64
+            
+            # Default packages (ARM64)
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}
+            xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:${{ steps.version.outputs.version }}
+            ```
+            
+            ### 📋 Installation
+            
+            #### Architecture-Specific (Recommended)
+            ```bash
+            # For AMD64 Kubernetes clusters
+            kubectl crossplane install provider ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}-amd64
+            
+            # For ARM64 Kubernetes clusters  
+            kubectl crossplane install provider ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}-arm64
+            ```
+            
+            #### Auto-Detect (Uses default)
+            ```bash
+            kubectl crossplane install provider ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}
+            ```
+            
+            ### ✅ Architecture Verification
+            ```bash
+            # Verify controller image architectures
+            docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}-controller
+            
+            # Verify package architectures
+            docker inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}-amd64 | jq '.[0].Architecture'
+            docker inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}-arm64 | jq '.[0].Architecture'
+            ```
+          files: |
+            packages/package-amd64/*
+            packages/package-arm64/*
+            provider-nutanix-${{ steps.version.outputs.version }}.xpkg
+          draft: false
+          prerelease: false
