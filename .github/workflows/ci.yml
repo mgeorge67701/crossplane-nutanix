@@ -45,26 +45,14 @@ jobs:
           
           # Only bump version if there are new, relevant commits
           if [ -n "$COMMITS_SINCE_TAG" ]; then
-            bump="patch"
-            if echo "$COMMITS_SINCE_TAG" | grep -qE 'BREAKING|breaking|major:'; then
-              bump=major
-            elif echo "$COMMITS_SINCE_TAG" | grep -qE '(^feat:|^feature:|minor:)'; then
-              bump=minor
-            fi
-            
+            # Always increment patch version
             ver=${LAST_TAG#v}
             IFS='.' read -r major minor patch <<< "$ver"
             major=${major:-0}
             minor=${minor:-0}
             patch=${patch:-0}
             
-            if [ "$bump" = "major" ]; then
-              major=$((major+1)); minor=0; patch=0
-            elif [ "$bump" = "minor" ]; then
-              minor=$((minor+1)); patch=0
-            else
-              patch=$((patch+1))
-            fi
+            patch=$((patch+1))
             
             NEW_TAG="v${major}.${minor}.${patch}"
             VERSION_TO_USE=$NEW_TAG
@@ -119,8 +107,8 @@ jobs:
           push: true
           platforms: linux/amd64,linux/arm64
           tags: |
-            ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}-controller
-            ghcr.io/${{ github.repository_owner }}/provider-nutanix:latest-controller
+            ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}
+            ghcr.io/${{ github.repository_owner }}/provider-nutanix:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
           no-cache: true
@@ -128,9 +116,9 @@ jobs:
       # Manual docker push steps removed; build-push-action handles all tags
       - name: Verify multi-arch manifest
         run: |
-          docker buildx imagetools inspect ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}-controller
+          docker buildx imagetools inspect ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}
       - name: Replace version placeholder
-        run: sed -i -e "s|ghcr.io/${{ github.repository_owner }}/provider-nutanix:.*|ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}-controller|g" crossplane-package/crossplane.yaml
+        run: sed -i -e "s|ghcr.io/${{ github.repository_owner }}/provider-nutanix:.*|ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}|g" crossplane-package/crossplane.yaml
       - name: Install Upbound CLI
         run: |
           curl -sL https://cli.upbound.io | sh
@@ -139,7 +127,7 @@ jobs:
       #   run: bash scripts/sync-readme.sh crossplane-package/crossplane.yaml
       - name: Build .xpkg
         run: |
-          up xpkg build --package-root=crossplane-package --controller=ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}-controller -o provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
+          up xpkg build --package-root=crossplane-package --controller=ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} -o provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
       - name: Upload .xpkg
         uses: actions/upload-artifact@v4
         with:
