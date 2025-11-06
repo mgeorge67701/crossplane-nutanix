@@ -111,7 +111,6 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/provider-nutanix:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          no-cache: true
 
       - name: Verify multi-arch manifest in GHCR
         run: |
