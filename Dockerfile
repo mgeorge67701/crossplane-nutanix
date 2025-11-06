@@ -22,7 +22,7 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64} go build \
     -a -installsuffix cgo \
     -o provider ./cmd/provider
 
-FROM alpine:3.20
+FROM --platform=$TARGETPLATFORM alpine:3.20
 
 COPY --from=builder /workspace/provider /provider
 
