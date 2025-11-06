@@ -113,10 +113,14 @@ jobs:
           cache-to: type=gha,mode=max
           no-cache: true
 
-      # Manual docker push steps removed; build-push-action handles all tags
-      - name: Verify multi-arch manifest
-        run: |
-          docker buildx imagetools inspect ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}
+      - name: Build and load single-arch image for xpkg build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          platforms: linux/amd64
+          tags: ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}
+          cache-from: type=gha
       - name: Replace version placeholder
         run: sed -i -e "s|ghcr.io/${{ github.repository_owner }}/provider-nutanix:.*|ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}|g" crossplane-package/crossplane.yaml
       - name: Install Upbound CLI
