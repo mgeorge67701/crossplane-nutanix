@@ -138,16 +138,11 @@ jobs:
         run: |
           curl -sL https://cli.upbound.io | sh
           sudo mv up /usr/local/bin/
-      - name: Inject controller image into package.yaml
+      - name: Update controller image in package.yaml
         run: |
-          cat package/package.yaml
-          echo "---"
-          cat >> package/package.yaml << EOF
-  controller:
-    image: ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}-controller
-EOF
-          echo "After injection:"
-          cat package/package.yaml
+          sed -i "s|image: ghcr.io/${{ github.repository_owner }}/provider-nutanix:.*-controller|image: ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}-controller|g" package/package.yaml
+          echo "Updated package.yaml:"
+          grep -A2 "controller:" package/package.yaml
       - name: Build .xpkg
         run: |
           up xpkg build --package-root=package -o provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
