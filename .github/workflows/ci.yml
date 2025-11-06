@@ -178,8 +178,8 @@ jobs:
       - name: Push package to Upbound Registry
         run: |
           # Use up CLI to push the package
-          up xpkg push xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }} -f provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg || echo "Failed with up CLI push method 1"
-          up xpkg push xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:latest -f provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg || echo "Failed with up CLI push method 2"
+          up xpkg push xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix-xpkg:${{ needs.auto_tag.outputs.version }} -f provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg || echo "Failed with up CLI push method 1"
+          up xpkg push xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix-xpkg:latest -f provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg || echo "Failed with up CLI push method 2"
       - name: Login to GitHub Container Registry for xpkg
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
