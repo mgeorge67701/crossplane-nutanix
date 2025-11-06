@@ -1,0 +1,7 @@
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-nutanix
+spec:
+  package: ghcr.io/mgeorge67701/provider-nutanix:v0.3.41
+  packagePullPolicy: Always
