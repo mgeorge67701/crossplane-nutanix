@@ -684,3 +684,4 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 - **Issues**: [GitHub Issues](https://github.com/mgeorge67701/crossplane-nutanix/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/mgeorge67701/crossplane-nutanix/discussions)
 - **Crossplane Community**: [Crossplane Slack](https://slack.crossplane.io/)
+# Multi-arch build test
