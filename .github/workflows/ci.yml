@@ -113,6 +113,10 @@ jobs:
           cache-to: type=gha,mode=max
           no-cache: true
 
+      - name: Verify multi-arch manifest in GHCR
+        run: |
+          docker buildx imagetools inspect ghcr.io/${{ github.repository_owner }}/provider-nutanix:${{ needs.auto_tag.outputs.version }}
+
       - name: Build and load single-arch image for xpkg build
         uses: docker/build-push-action@v6
         with:
