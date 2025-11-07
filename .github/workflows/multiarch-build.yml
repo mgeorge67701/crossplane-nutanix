@@ -88,6 +88,10 @@ jobs:
           curl -sL "https://cli.upbound.io" | sh
           sudo mv up /usr/local/bin/
 
+      - name: Login to Upbound
+        if: ${{ secrets.UPBOUND_TOKEN }}
+        run: up login --token="${{ secrets.UPBOUND_TOKEN }}"
+
       - name: Login to GHCR
         uses: docker/login-action@v3
         with:
@@ -119,6 +123,13 @@ jobs:
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           up xpkg push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION}-${{ matrix.arch }} \
+            -f provider-nutanix-${VERSION}-${{ matrix.arch }}.xpkg
+
+      - name: Push to Upbound
+        if: ${{ secrets.UPBOUND_TOKEN }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          up xpkg push xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:${VERSION}-${{ matrix.arch }} \
             -f provider-nutanix-${VERSION}-${{ matrix.arch }}.xpkg
 
       - name: Upload package artifact
