@@ -203,3 +203,4 @@ jobs:
           files: provider-nutanix-${{ needs.auto_tag.outputs.version }}.xpkg
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
