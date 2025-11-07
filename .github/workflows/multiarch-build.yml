@@ -89,8 +89,8 @@ jobs:
           sudo mv up /usr/local/bin/
 
       - name: Login to Upbound
-        if: ${{ secrets.UPBOUND_TOKEN != '' }}
-        run: up login --token="${{ secrets.UPBOUND_TOKEN }}"
+        continue-on-error: true
+        run: up login --token="${{ secrets.UPBOUND_TOKEN || 'no-token' }}"
 
       - name: Login to GHCR
         uses: docker/login-action@v3
@@ -126,7 +126,7 @@ jobs:
             -f provider-nutanix-${VERSION}-${{ matrix.arch }}.xpkg
 
       - name: Push to Upbound
-        if: ${{ secrets.UPBOUND_TOKEN != '' }}
+        continue-on-error: true
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           up xpkg push xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:${VERSION}-${{ matrix.arch }} \
