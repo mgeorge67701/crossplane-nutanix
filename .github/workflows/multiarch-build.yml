@@ -164,6 +164,23 @@ jobs:
         with:
           path: packages
 
+      - name: Install Up CLI
+        run: |
+          curl -sL "https://cli.upbound.io" | sh
+          sudo mv up /usr/local/bin/
+
+      - name: Login to Upbound
+        continue-on-error: true
+        run: up login --token="${{ secrets.UPBOUND_TOKEN || 'no-token' }}"
+
+      - name: Push default version to Upbound (for marketplace indexing)
+        continue-on-error: true
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          # Use ARM64 as default since it's more common in cloud
+          up xpkg push xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:${VERSION} \
+            -f packages/package-arm64/provider-nutanix-${VERSION}-arm64.xpkg
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
