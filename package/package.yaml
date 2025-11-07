@@ -1,3 +1,4 @@
+# yaml-language-server: disable
 apiVersion: meta.pkg.crossplane.io/v1
 kind: Provider
 metadata:
