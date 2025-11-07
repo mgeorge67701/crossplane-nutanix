@@ -8,6 +8,8 @@ on:
         required: true
         type: string
   push:
+    branches:
+      - main
     tags:
       - 'v*'
 
@@ -16,17 +18,79 @@ env:
   IMAGE_NAME: ${{ github.repository_owner }}/provider-nutanix
 
 jobs:
+  # Auto-tag version
+  auto-tag:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.set_version.outputs.version }}
+      should_build: ${{ steps.set_version.outputs.should_build }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine and create version tag
+        id: set_version
+        run: |
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.2.40")
+          
+          # Extract version numbers
+          ver=${LAST_TAG#v}
+          IFS='.' read -r major minor patch <<< "$ver"
+          major=${major:-0}
+          minor=${minor:-2}
+          patch=${patch:-40}
+          
+          # Increment patch version
+          patch=$((patch+1))
+          NEW_TAG="v${major}.${minor}.${patch}"
+          
+          echo "Last tag: $LAST_TAG"
+          echo "New tag: $NEW_TAG"
+          
+          # Create and push tag
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag $NEW_TAG
+          git push origin $NEW_TAG
+          
+          echo "version=${NEW_TAG}" >> $GITHUB_OUTPUT
+          echo "should_build=true" >> $GITHUB_OUTPUT
+
   # Build multi-arch controller image
   build-controller:
+    needs: [auto-tag]
+    if: |
+      always() && 
+      (needs.auto-tag.outputs.should_build == 'true' || 
+       github.event_name == 'workflow_dispatch' || 
+       github.event_name == 'push' && startsWith(github.ref, 'refs/tags/'))
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     outputs:
-      version: ${{ steps.meta.outputs.version }}
+      version: ${{ steps.version.outputs.version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Set version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            VERSION="${{ inputs.version }}"
+          elif [ "${{ github.event_name }}" == "push" ] && [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/}"
+          else
+            VERSION="${{ needs.auto-tag.outputs.version }}"
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Building version: ${VERSION}"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -38,27 +102,17 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=ref,event=tag,suffix=-controller
-            type=raw,value=${{ inputs.version }}-controller,enable=${{ github.event_name == 'workflow_dispatch' }}
-
       - name: Build and push controller
         uses: docker/build-push-action@v5
         with:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}-controller
 
   # Build packages for each architecture
   build-packages:
-    needs: build-controller
+    needs: [auto-tag, build-controller]
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -78,8 +132,10 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             VERSION="${{ inputs.version }}"
-          else
+          elif [ "${{ github.event_name }}" == "push" ] && [[ "${{ github.ref }}" == refs/tags/* ]]; then
             VERSION="${GITHUB_REF#refs/tags/}"
+          else
+            VERSION="${{ needs.build-controller.outputs.version }}"
           fi
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
 
@@ -140,7 +196,7 @@ jobs:
 
   # Create GitHub release
   create-release:
-    needs: [build-controller, build-packages]
+    needs: [auto-tag, build-controller, build-packages]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -154,8 +210,10 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             VERSION="${{ inputs.version }}"
-          else
+          elif [ "${{ github.event_name }}" == "push" ] && [[ "${{ github.ref }}" == refs/tags/* ]]; then
             VERSION="${GITHUB_REF#refs/tags/}"
+          else
+            VERSION="${{ needs.build-controller.outputs.version }}"
           fi
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
 
