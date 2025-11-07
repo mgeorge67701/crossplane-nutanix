@@ -85,9 +85,6 @@ jobs:
           curl -sL "https://cli.upbound.io" | sh
           sudo mv up /usr/local/bin/
 
-      - name: Login to Upbound
-        run: up login --token="${{ secrets.UPBOUND_TOKEN }}"
-
       - name: Login to GHCR
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
@@ -106,12 +103,6 @@ jobs:
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           up xpkg push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION}-${{ matrix.arch }} \
-            -f provider-nutanix-${VERSION}-${{ matrix.arch }}.xpkg
-
-      - name: Push to Upbound
-        run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          up xpkg push xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:${VERSION}-${{ matrix.arch }} \
             -f provider-nutanix-${VERSION}-${{ matrix.arch }}.xpkg
 
       - name: Upload package artifact
@@ -151,9 +142,6 @@ jobs:
           curl -sL "https://cli.upbound.io" | sh
           sudo mv up /usr/local/bin/
 
-      - name: Login to Upbound
-        run: up login --token="${{ secrets.UPBOUND_TOKEN }}"
-
       - name: Login to GHCR
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
@@ -164,9 +152,8 @@ jobs:
           # Use ARM64 as default (could be changed to AMD64 if preferred)
           cp packages/package-arm64/provider-nutanix-${VERSION}-arm64.xpkg provider-nutanix-${VERSION}.xpkg
           
-          # Push default packages
+          # Push default package to GHCR only
           up xpkg push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION} -f provider-nutanix-${VERSION}.xpkg
-          up xpkg push xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:${VERSION} -f provider-nutanix-${VERSION}.xpkg
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
