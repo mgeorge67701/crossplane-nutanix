@@ -89,7 +89,16 @@ jobs:
           sudo mv up /usr/local/bin/
 
       - name: Login to GHCR
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull controller image
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION}-controller
 
       - name: Build package for ${{ matrix.arch }}
         run: |
@@ -103,7 +112,7 @@ jobs:
           up xpkg build \
             --package-root=package \
             --controller=${CONTROLLER_IMAGE} \
-            -o provider-nutanix-${VERSION}-${{ matrix.arch }}.xpkg --verbose
+            -o provider-nutanix-${VERSION}-${{ matrix.arch }}.xpkg
 
       - name: Push to GHCR
         run: |
