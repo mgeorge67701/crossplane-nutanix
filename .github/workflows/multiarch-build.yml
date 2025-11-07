@@ -177,9 +177,9 @@ jobs:
         continue-on-error: true
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          # Use ARM64 as default since it's more common in cloud
+          # Use AMD64 as default for broader compatibility
           up xpkg push xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:${VERSION} \
-            -f packages/package-arm64/provider-nutanix-${VERSION}-arm64.xpkg
+            -f packages/package-amd64/provider-nutanix-${VERSION}-amd64.xpkg
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
