@@ -89,7 +89,7 @@ jobs:
           sudo mv up /usr/local/bin/
 
       - name: Login to Upbound
-        if: ${{ secrets.UPBOUND_TOKEN }}
+        if: secrets.UPBOUND_TOKEN != ''
         run: up login --token="${{ secrets.UPBOUND_TOKEN }}"
 
       - name: Login to GHCR
@@ -126,7 +126,7 @@ jobs:
             -f provider-nutanix-${VERSION}-${{ matrix.arch }}.xpkg
 
       - name: Push to Upbound
-        if: ${{ secrets.UPBOUND_TOKEN }}
+        if: secrets.UPBOUND_TOKEN != ''
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           up xpkg push xpkg.upbound.io/${{ github.repository_owner }}/provider-nutanix:${VERSION}-${{ matrix.arch }} \
