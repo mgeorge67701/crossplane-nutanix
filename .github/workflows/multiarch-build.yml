@@ -56,10 +56,13 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
-  # Build package (single, works for all architectures)
-  build-package:
+  # Build packages for each architecture
+  build-packages:
     needs: build-controller
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [amd64, arm64]
     permissions:
       contents: read
       packages: write
@@ -92,40 +95,41 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Pull controller image
+      - name: Pull controller image for specific architecture
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION}-controller
+          # Pull specific architecture from multi-arch image
+          docker pull --platform=linux/${{ matrix.arch }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION}-controller
 
-      - name: Build package
+      - name: Build package for ${{ matrix.arch }}
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           CONTROLLER_IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION}-controller"
           
-          echo "Building xpkg for ${VERSION} with multi-arch controller ${CONTROLLER_IMAGE}"
+          echo "Building xpkg for ${VERSION}-${{ matrix.arch }} with controller ${CONTROLLER_IMAGE}"
           ls -la package/
           
-          # Build the package (references multi-arch controller, works for all architectures)
+          # Build the package (will embed the pulled architecture)
           up xpkg build \
             --package-root=package \
             --controller=${CONTROLLER_IMAGE} \
-            -o provider-nutanix-${VERSION}.xpkg
+            -o provider-nutanix-${VERSION}-${{ matrix.arch }}.xpkg
 
       - name: Push to GHCR
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          up xpkg push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION} \
-            -f provider-nutanix-${VERSION}.xpkg
+          up xpkg push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION}-${{ matrix.arch }} \
+            -f provider-nutanix-${VERSION}-${{ matrix.arch }}.xpkg
 
       - name: Upload package artifact
         uses: actions/upload-artifact@v4
         with:
-          name: provider-package
-          path: provider-nutanix-${{ steps.version.outputs.version }}.xpkg
+          name: package-${{ matrix.arch }}
+          path: provider-nutanix-${{ steps.version.outputs.version }}-${{ matrix.arch }}.xpkg
 
   # Create GitHub release
   create-release:
-    needs: [build-controller, build-package]
+    needs: [build-controller, build-packages]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -144,11 +148,10 @@ jobs:
           fi
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
 
-      - name: Download package artifact
+      - name: Download package artifacts
         uses: actions/download-artifact@v4
         with:
-          name: provider-package
-          path: .
+          path: packages
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
