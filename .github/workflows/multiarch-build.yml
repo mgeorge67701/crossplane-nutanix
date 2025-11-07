@@ -56,13 +56,10 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
-  # Build packages for each architecture
-  build-packages:
+  # Build package (single, works for all architectures)
+  build-package:
     needs: build-controller
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        arch: [amd64, arm64]
     permissions:
       contents: read
       packages: write
@@ -100,35 +97,35 @@ jobs:
           VERSION="${{ steps.version.outputs.version }}"
           docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION}-controller
 
-      - name: Build package for ${{ matrix.arch }}
+      - name: Build package
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           CONTROLLER_IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION}-controller"
           
-          echo "Building xpkg for ${VERSION} with controller ${CONTROLLER_IMAGE}"
+          echo "Building xpkg for ${VERSION} with multi-arch controller ${CONTROLLER_IMAGE}"
           ls -la package/
           
-          # Build the package
+          # Build the package (references multi-arch controller, works for all architectures)
           up xpkg build \
             --package-root=package \
             --controller=${CONTROLLER_IMAGE} \
-            -o provider-nutanix-${VERSION}-${{ matrix.arch }}.xpkg
+            -o provider-nutanix-${VERSION}.xpkg
 
       - name: Push to GHCR
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          up xpkg push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION}-${{ matrix.arch }} \
-            -f provider-nutanix-${VERSION}-${{ matrix.arch }}.xpkg
+          up xpkg push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION} \
+            -f provider-nutanix-${VERSION}.xpkg
 
       - name: Upload package artifact
         uses: actions/upload-artifact@v4
         with:
-          name: package-${{ matrix.arch }}
-          path: provider-nutanix-${{ steps.version.outputs.version }}-${{ matrix.arch }}.xpkg
+          name: provider-package
+          path: provider-nutanix-${{ steps.version.outputs.version }}.xpkg
 
-  # Create default packages and GitHub release
+  # Create GitHub release
   create-release:
-    needs: [build-controller, build-packages]
+    needs: [build-controller, build-package]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -147,28 +144,11 @@ jobs:
           fi
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
 
-      - name: Download package artifacts
+      - name: Download package artifact
         uses: actions/download-artifact@v4
         with:
-          path: packages
-
-      - name: Install Up CLI
-        run: |
-          curl -sL "https://cli.upbound.io" | sh
-          sudo mv up /usr/local/bin/
-
-      - name: Login to GHCR
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-
-      - name: Create default packages
-        run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          
-          # Use ARM64 as default (could be changed to AMD64 if preferred)
-          cp packages/package-arm64/provider-nutanix-${VERSION}-arm64.xpkg provider-nutanix-${VERSION}.xpkg
-          
-          # Push default package to GHCR only
-          up xpkg push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION} -f provider-nutanix-${VERSION}.xpkg
+          name: provider-package
+          path: .
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
