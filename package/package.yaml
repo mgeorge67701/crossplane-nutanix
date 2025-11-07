@@ -24,6 +24,31 @@ metadata:
       - Additional disk attachment
       - Custom metadata support
 
+      ## Registry Options
+
+      Available on multiple registries with AMD64 and ARM64 support:
+
+      **Upbound Registry:**
+      ```bash
+      # AMD64-specific package
+      xpkg.upbound.io/mgeorge67701/provider-nutanix:<version>-amd64
+      
+      # ARM64 package  
+      xpkg.upbound.io/mgeorge67701/provider-nutanix:<version>-arm64
+      
+      # Default (AMD64)
+      xpkg.upbound.io/mgeorge67701/provider-nutanix:<version>
+      ```
+
+      **GitHub Container Registry:**
+      ```bash
+      # AMD64-specific package
+      ghcr.io/mgeorge67701/provider-nutanix:<version>-amd64
+
+      # ARM64 package
+      ghcr.io/mgeorge67701/provider-nutanix:<version>-arm64
+      ```
+
       ## Quick Start
 
       Install the provider:
