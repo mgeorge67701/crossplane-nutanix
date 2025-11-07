@@ -70,6 +70,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Set version
         id: version
         run: |
@@ -93,11 +96,14 @@ jobs:
           VERSION="${{ steps.version.outputs.version }}"
           CONTROLLER_IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION}-controller"
           
+          echo "Building xpkg for ${VERSION} with controller ${CONTROLLER_IMAGE}"
+          ls -la package/
+          
           # Build the package
           up xpkg build \
             --package-root=package \
             --controller=${CONTROLLER_IMAGE} \
-            -o provider-nutanix-${VERSION}-${{ matrix.arch }}.xpkg
+            -o provider-nutanix-${VERSION}-${{ matrix.arch }}.xpkg --verbose
 
       - name: Push to GHCR
         run: |
